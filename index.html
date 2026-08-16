@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#5b4b8a"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg">
+<link rel="stylesheet" href="styles.css"><title>Memoria del Lector V5</title>
+</head>
+<body>
+<header class="top"><div><div class="eyebrow">Lu Herramientas</div><h1>🧠 Memoria del Lector <span class="version">V5</span></h1><p>Tu memoria externa para volver a entrar en una historia.</p></div><button id="installBtn" class="ghost hidden">Instalar</button></header>
+<nav class="tabs" id="tabs"><button data-view="home" class="active">📚 Biblioteca</button><button data-view="characters">👥 Personajes</button><button data-view="map">🕸️ Mapa</button><button data-view="quotes">💬 Fragmentos</button><button data-view="sessions">📖 Sesiones de lectura</button><button data-view="recap">🧠 Retomar</button></nav>
+<main id="app"></main>
+<div id="modal" class="modal hidden"><div class="modal-card"><button class="close" id="closeModal">×</button><div id="modalBody"></div></div></div>
+<div id="toast" class="toast hidden"></div>
+<script src="app.js"></script>
+</body></html>
