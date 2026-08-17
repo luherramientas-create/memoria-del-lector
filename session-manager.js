@@ -1,4 +1,4 @@
-// Session manager V2: multiple characters + multiple discovered relationships in one session.
+// Session manager V2.1: multiple characters + multiple discovered relationships with deterministic draft ID resolution.
 (function(){
   const draft={characters:[],relations:[]};
   const esc2=s=>String(s??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#039;'}[c]));
@@ -59,23 +59,38 @@
   }
   function sessionUpdateCharacter(id,key,value){const c=draft.characters.find(x=>x.id===id);if(c)c[key]=value; if(key==='name')renderDraft()}
   function sessionUpdateRelation(id,key,value){const r=draft.relations.find(x=>x.id===id);if(r)r[key]=value}
-  function resolveDraftCharacter(c,b,chapter){
-    const existing=(b.characters||[]).find(x=>normalizeCharacterText(x.name)===normalizeCharacterText(c.name));
-    if(existing)return existing.id;
-    const obj={id:uid(),name:c.name.trim(),shortName:c.shortName.trim(),description:c.description.trim(),firstChapter:chapter||c.firstChapter||''};
-    b.characters.push(obj);return obj.id;
+
+  // Resolve every draft character exactly once per save and keep a stable
+  // temporary-id -> definitive-id mapping for all later relationship/session references.
+  function resolveDraftCharacters(b,chapter){
+    const idMap=new Map();
+    draft.characters.forEach(c=>{
+      if(!c.name.trim())return;
+      const existing=(b.characters||[]).find(x=>normalizeCharacterText(x.name)===normalizeCharacterText(c.name));
+      if(existing){
+        idMap.set(c.id,existing.id);
+        return;
+      }
+      const obj={id:uid(),name:c.name.trim(),shortName:c.shortName.trim(),description:c.description.trim(),firstChapter:chapter||c.firstChapter||''};
+      b.characters.push(obj);
+      idMap.set(c.id,obj.id);
+    });
+    return idMap;
   }
+
   function createSession(e){
     e.preventDefault();
     const f=new FormData(e.target),b=book(); if(!b)return;
     const chapter=f.get('chapter')||'', page=f.get('page')||'';
+    const idMap=resolveDraftCharacters(b,chapter);
+    const findId=id=>idMap.get(id)||id;
     const charIds=[];
-    draft.characters.forEach(c=>{if(c.name.trim())charIds.push(resolveDraftCharacter(c,b,chapter))});
-    const findId=id=>draft.characters.find(c=>c.id===id)?.name?resolveDraftCharacter(draft.characters.find(c=>c.id===id),b,chapter):id;
+    draft.characters.forEach(c=>{const id=findId(c.id);if(id&&!String(id).startsWith('draftc_'))charIds.push(id)});
     const relationshipIds=[];
     draft.relations.forEach(r=>{
       const from=findId(r.from),to=findId(r.to),label=r.label||'otra relación';
       if(!from||!to||from===to)return;
+      if(String(from).startsWith('draftc_')||String(to).startsWith('draftc_'))return;
       const info=inferRel(label), mode=r.mode||info.mode;
       const candidate={from,to,label,mode};
       const dup=typeof relationshipExists==='function'?relationshipExists(b,candidate):null;
@@ -83,7 +98,7 @@
       const data={id:uid(),from,to,items:[{label,mode,category:info.category}],types:[label],chapter,discoveryPoint:`Capítulo ${chapter}`};
       b.relationships.push(data);relationshipIds.push(data.id);
     });
-    const session={id:uid(),date:new Date().toLocaleString('es-CR'),chapter,page,summary:f.get('summary'),note:f.get('note'),plot:f.get('summary'),impression:f.get('note'),sessionType:'chapter',characterIds:[...new Set(charIds.concat(draft.relations.flatMap(r=>[findId(r.from),findId(r.to)]).filter(Boolean)))],relationshipIds:[...new Set(relationshipIds)],quoteIds:[],context:'',pointStart:`Capítulo ${chapter}`,pointEnd:`Capítulo ${chapter}${page?` · pág. ${page}`:''}`};
+    const session={id:uid(),date:new Date().toLocaleString('es-CR'),chapter,page,summary:f.get('summary'),note:f.get('note'),plot:f.get('summary'),impression:f.get('note'),sessionType:'chapter',characterIds:[...new Set(charIds)],relationshipIds:[...new Set(relationshipIds)],quoteIds:[],context:'',pointStart:`Capítulo ${chapter}`,pointEnd:`Capítulo ${chapter}${page?` · pág. ${page}`:''}`};
     b.sessions.push(session);save();close();resetDraft();renderSessions();toast('Sesión guardada con personajes y relaciones');
   }
   function renderSessions(){
