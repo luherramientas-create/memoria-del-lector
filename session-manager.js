@@ -53,9 +53,9 @@
   function renderDraft(){
     const cc=document.getElementById('sessionCharacters'),rr=document.getElementById('sessionRelations');
     if(!cc||!rr)return;
-    cc.innerHTML=draft.characters.length?draft.characters.map((c,i)=>`<div class="card session-draft-character"><div class="grid"><div class="field"><label>Nombre completo</label><input data-draft-id="${esc2(c.id)}" value="${esc2(c.name)}" oninput="sessionUpdateCharacter('${c.id}','name',this.value)" required></div><div class="field"><label>Nombre corto <span class="muted">(opcional)</span></label><input value="${esc2(c.shortName)}" oninput="sessionUpdateCharacter('${c.id}','shortName',this.value)"></div></div><div class="field"><label>Descripción</label><textarea oninput="sessionUpdateCharacter('${c.id}','description',this.value)">${esc2(c.description)}</textarea></div><button type="button" class="danger" onclick="sessionRemoveCharacter('${c.id}')">Eliminar de esta sesión</button></div>`).join(''):'<div class="muted">Aún no has agregado personajes.</div>';
-    rr.innerHTML=draft.relations.length?draft.relations.map((r,i)=>`<div class="card"><div class="grid"><div class="field"><label>Personaje A</label><select onchange="sessionUpdateRelation('${r.id}','from',this.value)">${characterOptions(r.from)}</select></div><div class="field"><label>Personaje B</label><select onchange="sessionUpdateRelation('${r.id}','to',this.value)">${characterOptions(r.to)}</select></div></div><div class="grid"><div class="field"><label>Relación</label><select onchange="sessionUpdateRelation('${r.id}','label',this.value);sessionUpdateRelation('${r.id}','mode',inferRel(this.value).mode)">${relationTypes()}</select></div><div class="field"><label>Capítulo descubierto</label><input type="number" min="0" value="${esc2(document.querySelector('#sessionV2Form [name=chapter]')?.value||'')}" disabled></div></div><button type="button" class="danger" onclick="sessionRemoveRelation('${r.id}')">Eliminar relación</button></div>`).join(''):'<div class="muted">Aún no has agregado relaciones.</div>';
-    draft.relations.forEach(r=>{const row=rr.querySelectorAll('.card')[draft.relations.indexOf(r)];const sel=row?.querySelectorAll('select')[2];if(sel)sel.value=r.label||''});
+    cc.innerHTML=draft.characters.length?draft.characters.map(c=>`<div class="card session-draft-character"><div class="grid"><div class="field"><label>Nombre completo</label><input data-draft-id="${esc2(c.id)}" value="${esc2(c.name)}" oninput="sessionUpdateCharacter('${c.id}','name',this.value)" required></div><div class="field"><label>Nombre corto <span class="muted">(opcional)</span></label><input value="${esc2(c.shortName)}" oninput="sessionUpdateCharacter('${c.id}','shortName',this.value)"></div></div><div class="field"><label>Descripción</label><textarea oninput="sessionUpdateCharacter('${c.id}','description',this.value)">${esc2(c.description)}</textarea></div><button type="button" class="danger" onclick="sessionRemoveCharacter('${c.id}')">Eliminar de esta sesión</button></div>`).join(''):'<div class="muted">Aún no has agregado personajes.</div>';
+    rr.innerHTML=draft.relations.length?draft.relations.map(r=>`<div class="card"><div class="grid"><div class="field"><label>Personaje A</label><select onchange="sessionUpdateRelation('${r.id}','from',this.value)">${characterOptions(r.from)}</select></div><div class="field"><label>Personaje B</label><select onchange="sessionUpdateRelation('${r.id}','to',this.value)">${characterOptions(r.to)}</select></div></div><div class="grid"><div class="field"><label>Relación</label><select onchange="sessionUpdateRelation('${r.id}','label',this.value);sessionUpdateRelation('${r.id}','mode',inferRel(this.value).mode)">${relationTypes()}</select></div><div class="field"><label>Capítulo descubierto</label><input type="number" min="0" value="${esc2(document.querySelector('#sessionV2Form [name=chapter]')?.value||'')}" disabled></div></div><button type="button" class="danger" onclick="sessionRemoveRelation('${r.id}')">Eliminar relación</button></div>`).join(''):'<div class="muted">Aún no has agregado relaciones.</div>';
+    draft.relations.forEach((r,i)=>{const row=rr.querySelectorAll('.card')[i];const sel=row?.querySelectorAll('select')[2];if(sel)sel.value=r.label||''});
   }
   function sessionUpdateCharacter(id,key,value){const c=draft.characters.find(x=>x.id===id);if(c)c[key]=value; if(key==='name')renderDraft()}
   function sessionUpdateRelation(id,key,value){const r=draft.relations.find(x=>x.id===id);if(r)r[key]=value}
@@ -71,15 +71,17 @@
     const chapter=f.get('chapter')||'', page=f.get('page')||'';
     const charIds=[];
     draft.characters.forEach(c=>{if(c.name.trim())charIds.push(resolveDraftCharacter(c,b,chapter))});
-    const allChars=[...(b.characters||[])];
     const findId=id=>draft.characters.find(c=>c.id===id)?.name?resolveDraftCharacter(draft.characters.find(c=>c.id===id),b,chapter):id;
     const relationshipIds=[];
     draft.relations.forEach(r=>{
       const from=findId(r.from),to=findId(r.to),label=r.label||'otra relación';
       if(!from||!to||from===to)return;
-      const info=inferRel(label), data={id:uid(),from,to,items:[{label,mode:r.mode||info.mode,category:info.category}],types:[label],chapter,discoveryPoint:`Capítulo ${chapter}`};
-      const dup=b.relationships.find(x=>x.from===data.from&&x.to===data.to&&(x.items||[]).some(i=>i.label===label&&i.mode===data.items[0].mode));
-      if(dup){relationshipIds.push(dup.id)}else{b.relationships.push(data);relationshipIds.push(data.id)}
+      const info=inferRel(label), mode=r.mode||info.mode;
+      const candidate={from,to,label,mode};
+      const dup=typeof relationshipExists==='function'?relationshipExists(b,candidate):null;
+      if(dup){relationshipIds.push(dup.id);return;}
+      const data={id:uid(),from,to,items:[{label,mode,category:info.category}],types:[label],chapter,discoveryPoint:`Capítulo ${chapter}`};
+      b.relationships.push(data);relationshipIds.push(data.id);
     });
     const session={id:uid(),date:new Date().toLocaleString('es-CR'),chapter,page,summary:f.get('summary'),note:f.get('note'),plot:f.get('summary'),impression:f.get('note'),sessionType:'chapter',characterIds:[...new Set(charIds.concat(draft.relations.flatMap(r=>[findId(r.from),findId(r.to)]).filter(Boolean)))],relationshipIds:[...new Set(relationshipIds)],quoteIds:[],context:'',pointStart:`Capítulo ${chapter}`,pointEnd:`Capítulo ${chapter}${page?` · pág. ${page}`:''}`};
     b.sessions.push(session);save();close();resetDraft();renderSessions();toast('Sesión guardada con personajes y relaciones');
