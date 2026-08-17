@@ -44,8 +44,24 @@
     modal(`<h2>🔗 Relación</h2><div class="relationship"><span class="node">${esc(nameOf(r.from))}</span><span class="arrow">${arrow}</span><span class="node">${esc(nameOf(r.to))}</span></div><p><strong>${esc(labelsOf(r))}</strong></p><p class="muted">Descubierto: ${chapter}</p>${r.sessionId?'<p class="muted">Asociada a una sesión de lectura.</p>':''}<div class="actions"><button class="primary" onclick="editRelationship('${r.id}')">Editar relación</button>${r.sessionId?`<button class="secondary" onclick="viewSession('${r.sessionId}')">Ver sesión</button>`:''}<button class="secondary" onclick="showMapPairRelations('${r.from}','${r.to}')">Volver a relaciones</button></div>`);
   };
 
-  function hideLabels(){
-    document.querySelectorAll('#app svg .map-edge text,#app svg .network-edge text').forEach(t=>t.remove());
+  function hideLabels(){document.querySelectorAll('#app svg .map-edge text,#app svg .network-edge text').forEach(t=>t.remove());}
+
+  function addHitTarget(g,a,b,rels){
+    const line=g.querySelector('line');if(!line)return;
+    let hit=g.querySelector('.map-edge-hit');
+    if(!hit){
+      hit=document.createElementNS(NS,'line');
+      hit.setAttribute('class','map-edge-hit');
+      hit.setAttribute('stroke','transparent');
+      hit.setAttribute('stroke-width','18');
+      hit.setAttribute('fill','none');
+      hit.setAttribute('pointer-events','stroke');
+      hit.style.pointerEvents='stroke';
+      g.appendChild(hit);
+    }
+    ['x1','y1','x2','y2'].forEach(k=>hit.setAttribute(k,line.getAttribute(k)||''));
+    hit.onclick=e=>{e.stopPropagation();showPairRelations(a,b);};
+    hit.ontouchstart=e=>{e.stopPropagation();showPairRelations(a,b);};
   }
 
   function wirePairGroup(g,a,b,rels){
@@ -58,16 +74,17 @@
     g.style.cursor='pointer';
     g.addEventListener('click',e=>{e.stopPropagation();showPairRelations(a,b);});
     g.addEventListener('touchstart',e=>{e.stopPropagation();showPairRelations(a,b);},{passive:true});
+    addHitTarget(g,a,b,rels);
   }
 
   function collapsePairs(){
     const svg=document.getElementById('mapSvg'),b=activeBook();if(!svg||!b)return;
     ensureStartMarker(svg);hideLabels();
 
-    const network=svg.querySelectorAll('.network-edge');
+    const network=[...svg.querySelectorAll('.network-edge')];
     if(network.length){
       const byPair=new Map();
-      [...network].forEach(g=>{const k=pairKey(g.dataset.from,g.dataset.to);if(!byPair.has(k))byPair.set(k,[]);byPair.get(k).push(g);});
+      network.forEach(g=>{const k=pairKey(g.dataset.from,g.dataset.to);if(!byPair.has(k))byPair.set(k,[]);byPair.get(k).push(g);});
       byPair.forEach((gs,k)=>{
         const [a,z]=k.split('|'),rels=pairRelations(a,z);if(!rels.length)return;
         const old=gs[0];
@@ -78,11 +95,13 @@
     }else{
       const focusEdges=[...svg.querySelectorAll('.map-edge')];
       if(!focusEdges.length)return;
+      const filtered=(typeof mapFilterData==='function'?mapFilterData(b):{rels:b.relationships||[]}).rels||[];
       const byPair=new Map();
       focusEdges.forEach((g,i)=>{
         if(g.dataset.pairCollapsed==='true')return;
-        const r=b.relationships?.[i];
+        const r=filtered[i];
         if(!r)return;
+        g.dataset.from=r.from;g.dataset.to=r.to;g.dataset.relId=r.id;
         const k=pairKey(r.from,r.to);
         if(!byPair.has(k))byPair.set(k,[]);byPair.get(k).push({g,r});
       });
@@ -98,7 +117,7 @@
 
   function styles(){
     if(document.getElementById('mapRelationInteractionStyles'))return;
-    const s=document.createElement('style');s.id='mapRelationInteractionStyles';s.textContent=`.map-edge line,.network-edge line,.network-edge-hit{cursor:pointer}.map-relation-list{display:flex;flex-direction:column;gap:8px;margin:12px 0}.map-relation-choice{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:1px solid rgba(91,75,138,.18);border-radius:10px;background:#f7f4ff;padding:10px 12px;cursor:pointer;color:inherit}.map-relation-choice:hover{background:#eee8ff}`;document.head.appendChild(s);
+    const s=document.createElement('style');s.id='mapRelationInteractionStyles';s.textContent=`.map-edge line,.network-edge line,.network-edge-hit,.map-edge-hit{cursor:pointer}.map-edge-hit{pointer-events:stroke!important}.map-relation-list{display:flex;flex-direction:column;gap:8px;margin:12px 0}.map-relation-choice{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:1px solid rgba(91,75,138,.18);border-radius:10px;background:#f7f4ff;padding:10px 12px;cursor:pointer;color:inherit}.map-relation-choice:hover{background:#eee8ff}`;document.head.appendChild(s);
   }
 
   function apply(){styles();collapsePairs();hideLabels();}
