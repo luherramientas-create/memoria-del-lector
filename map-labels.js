@@ -1,4 +1,4 @@
-/* FASE 3.0 — Una conexión visual por pareja + consulta interactiva de relaciones. */
+/* FASE 3.0 — Una conexión visual por pareja + consulta de relaciones al pasar el mouse. */
 (function(){
   const NS='http://www.w3.org/2000/svg';
   const pairKey=(a,b)=>[a,b].sort().join('|');
@@ -27,26 +27,30 @@
     const p=document.createElementNS(NS,'path');p.setAttribute('d','M 0 0 L 10 5 L 0 10 z');p.setAttribute('fill','#687080');m.appendChild(p);defs.appendChild(m);
   }
 
-  function showPairRelations(a,b){
-    const rels=pairRelations(a,b);if(!rels.length)return;
-    const rows=rels.map(r=>{
-      const arrow=modeOf(r)==='symmetric'?'↔':(r.from===a?'→':'←');
-      return `<button class="map-relation-choice" onclick="selectMapRelation('${r.id}')"><span>${arrow}</span><strong>${esc(labelsOf(r))}</strong></button>`;
-    }).join('');
-    modal(`<h2>🔗 Relaciones</h2><div class="relationship"><span class="node">${esc(nameOf(a))}</span><span class="arrow">↔</span><span class="node">${esc(nameOf(b))}</span></div><p class="muted">Selecciona la relación que quieres consultar.</p><div class="map-relation-list">${rows}</div><div class="actions"><button class="secondary" onclick="close()">Cerrar</button></div>`);
+  function relationArrow(r,a,b){
+    if(modeOf(r)==='symmetric')return '↔';
+    return r.from===a?'→':'←';
   }
 
-  window.showMapPairRelations=showPairRelations;
-  window.selectMapRelation=function(id){
-    const b=activeBook(),r=b?.relationships?.find(x=>x.id===id);if(!r)return;
-    const arrow=modeOf(r)==='symmetric'?'↔':(r.from===r.to?'→':'→');
-    const chapter=typeof hasKnownChapter==='function'&&hasKnownChapter(r.chapter)?`Capítulo ${esc(r.chapter)}`:'Capítulo desconocido';
-    modal(`<h2>🔗 Relación</h2><div class="relationship"><span class="node">${esc(nameOf(r.from))}</span><span class="arrow">${arrow}</span><span class="node">${esc(nameOf(r.to))}</span></div><p><strong>${esc(labelsOf(r))}</strong></p><p class="muted">Descubierto: ${chapter}</p>${r.sessionId?'<p class="muted">Asociada a una sesión de lectura.</p>':''}<div class="actions"><button class="primary" onclick="editRelationship('${r.id}')">Editar relación</button>${r.sessionId?`<button class="secondary" onclick="viewSession('${r.sessionId}')">Ver sesión</button>`:''}<button class="secondary" onclick="showMapPairRelations('${r.from}','${r.to}')">Volver a relaciones</button></div>`);
-  };
+  function showPairTooltip(a,b,e){
+    const tip=document.getElementById('mapTooltip'),wrap=document.getElementById('mapWrap');
+    const rels=pairRelations(a,b);if(!tip||!wrap||!rels.length)return;
+    const rows=rels.map(r=>`<div class="map-relation-tooltip-row"><span class="map-relation-tooltip-arrow">${relationArrow(r,a,b)}</span><strong>${esc(labelsOf(r))}</strong></div>`).join('');
+    tip.innerHTML=`<strong>${esc(nameOf(a))} ↔ ${esc(nameOf(b))}</strong><div class="map-relation-tooltip-title">Relaciones:</div>${rows}`;
+    tip.classList.remove('hidden');
+    const rect=wrap.getBoundingClientRect();
+    const clientX=e?.clientX??rect.left+20,clientY=e?.clientY??rect.top+20;
+    let x=clientX-rect.left+14,y=clientY-rect.top+14;
+    x=Math.max(8,Math.min(Math.max(8,rect.width-270),x));
+    y=Math.max(8,Math.min(Math.max(8,rect.height-120),y));
+    tip.style.left=x+'px';tip.style.top=y+'px';
+  }
+
+  window.showMapPairRelations=showPairTooltip;
 
   function hideLabels(){document.querySelectorAll('#app svg .map-edge text,#app svg .network-edge text').forEach(t=>t.remove());}
 
-  function addHitTarget(g,a,b,rels){
+  function addHitTarget(g){
     const line=g.querySelector('line');if(!line)return;
     let hit=g.querySelector('.map-edge-hit');
     if(!hit){
@@ -60,8 +64,6 @@
       g.appendChild(hit);
     }
     ['x1','y1','x2','y2'].forEach(k=>hit.setAttribute(k,line.getAttribute(k)||''));
-    hit.onclick=e=>{e.stopPropagation();showPairRelations(a,b);};
-    hit.ontouchstart=e=>{e.stopPropagation();showPairRelations(a,b);};
   }
 
   function wirePairGroup(g,a,b,rels){
@@ -71,10 +73,12 @@
     if(d==='both'){line.setAttribute('marker-start','url(#arrowHeadStart)');line.setAttribute('marker-end','url(#arrowHead)');}
     else if(d==='forward')line.setAttribute('marker-end','url(#arrowHead)');
     else line.setAttribute('marker-start','url(#arrowHeadStart)');
-    g.style.cursor='pointer';
-    g.addEventListener('click',e=>{e.stopPropagation();showPairRelations(a,b);});
-    g.addEventListener('touchstart',e=>{e.stopPropagation();showPairRelations(a,b);},{passive:true});
-    addHitTarget(g,a,b,rels);
+    addHitTarget(g);
+    g.style.cursor='help';
+    g.addEventListener('mouseenter',e=>showPairTooltip(a,b,e));
+    g.addEventListener('mousemove',e=>showPairTooltip(a,b,e));
+    g.addEventListener('mouseleave',()=>hideNodeTooltip());
+    g.addEventListener('touchstart',e=>{e.stopPropagation();showPairTooltip(a,b,e.touches[0]);setTimeout(hideNodeTooltip,3200)},{passive:true});
   }
 
   function collapsePairs(){
@@ -117,7 +121,7 @@
 
   function styles(){
     if(document.getElementById('mapRelationInteractionStyles'))return;
-    const s=document.createElement('style');s.id='mapRelationInteractionStyles';s.textContent=`.map-edge line,.network-edge line,.network-edge-hit,.map-edge-hit{cursor:pointer}.map-edge-hit{pointer-events:stroke!important}.map-relation-list{display:flex;flex-direction:column;gap:8px;margin:12px 0}.map-relation-choice{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:1px solid rgba(91,75,138,.18);border-radius:10px;background:#f7f4ff;padding:10px 12px;cursor:pointer;color:inherit}.map-relation-choice:hover{background:#eee8ff}`;document.head.appendChild(s);
+    const s=document.createElement('style');s.id='mapRelationInteractionStyles';s.textContent=`.map-edge line,.network-edge line,.network-edge-hit,.map-edge-hit{cursor:help}.map-edge-hit{pointer-events:stroke!important}.map-relation-tooltip-title{margin-top:5px;font-weight:600}.map-relation-tooltip-row{display:flex;gap:7px;align-items:center;margin-top:3px}.map-relation-tooltip-arrow{display:inline-block;min-width:18px;font-weight:700}`;document.head.appendChild(s);
   }
 
   function apply(){styles();collapsePairs();hideLabels();}
