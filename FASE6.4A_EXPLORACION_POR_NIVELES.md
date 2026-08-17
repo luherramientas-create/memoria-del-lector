@@ -1,30 +1,57 @@
-# FASE 6.4A — Exploración por niveles del mapa neuronal
+# FASE 6.4A — Exploración por niveles y distribución del mapa neuronal
+
+## Estado
+
+Implementada y experimental.
 
 ## Objetivo
-Añadir exploración visual por profundidad a partir de un personaje seleccionado, sin modificar los datos persistentes ni el mapa tradicional.
 
-## Opciones
-- **Toda**: muestra toda la red.
-- **1**: personaje seleccionado y conexiones directas.
-- **2**: hasta dos niveles de distancia.
-- **3**: hasta tres niveles de distancia.
+Permitir explorar la red por profundidad (1, 2, 3 o toda la red) y mejorar la distribución inicial para reducir agrupamientos, superposiciones y la necesidad de arrastrar manualmente los personajes.
 
-## Algoritmo
-Se utiliza un recorrido BFS sobre la conectividad del grafo. Para esta función, la dirección semántica de una relación no impide considerar conectados a sus dos extremos. La distancia es la mínima dentro del grafo; múltiples relaciones entre el mismo par cuentan como un único vínculo de conectividad.
+## Distribución
 
-## Comportamiento
-- Sin personaje seleccionado, la vista permanece en toda la red.
-- Al seleccionar un personaje se puede elegir 1, 2 o 3 niveles.
-- Los nodos y conexiones fuera de la profundidad se atenúan visualmente; no se eliminan del estado ni del DOM.
-- Al deseleccionar, se vuelve a toda la red.
-- Cambiar de personaje recalcula la profundidad desde el nuevo origen.
-- Zoom, pan, arrastre de nodos, tooltips y reorganización se mantienen.
+El mapa utiliza un layout de fuerzas mejorado con:
 
-## Integridad
-No se modifican `characters`, `relationships`, sesiones, fusión ni `localStorage`. El mapa tradicional permanece separado.
+- repulsión entre nodos;
+- atracción entre personajes conectados;
+- separación mínima adicional considerando el ancho aproximado de las etiquetas;
+- margen respecto a los bordes;
+- enfriamiento progresivo de la simulación;
+- resolución posterior de solapamientos;
+- distribución inicial determinista mediante espiral de baja densidad;
+- funcionamiento con distintos tamaños de grafo.
 
-## Limitaciones
-No se implementan todavía filtros por tipo de relación, comunidades, métricas, búsqueda ni análisis avanzados.
+El layout solo modifica posiciones visuales. No modifica personajes ni relaciones.
+
+## Exploración
+
+Al seleccionar un personaje se puede elegir:
+
+- **Toda**: red completa;
+- **1**: conexiones directas;
+- **2**: hasta dos niveles;
+- **3**: hasta tres niveles.
+
+La distancia se calcula mediante BFS sobre la conectividad del grafo. La dirección semántica de una relación se conserva para su representación, pero no impide recorrer el vínculo durante la exploración.
+
+## Interacción conservada
+
+- selección de personaje;
+- tooltip de personaje y relación;
+- zoom con rueda y controles;
+- pan arrastrando el espacio vacío;
+- arrastre individual de nodos;
+- ajustar vista;
+- reorganizar.
+
+## Restricciones
+
+No se modifican datos persistentes, personajes, relaciones, sesiones, fusión ni el mapa tradicional.
+
+## Prueba recomendada
+
+Abrir el mapa neuronal con el libro real y comprobar que los 21 personajes de prueba se distribuyen con separación suficiente desde el primer renderizado. Después probar selección, niveles 1–3, zoom, pan y arrastre manual.
 
 ## Commit
-`26f7cba524674f35460f435b445e71a53b6f1d69`
+
+`f869f708a51aef1a301cbe0163827202bf565606`
