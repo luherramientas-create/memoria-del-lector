@@ -126,4 +126,8 @@
   };
 
   document.addEventListener('change',e=>{ if(e.target && e.target.id==='bookCoverFile'){ window.__pendingBookCover=null; const s=document.getElementById('bookCoverStatus'); if(s)s.textContent='Imagen seleccionada. Pulsa “Previsualizar” para procesarla.'; }});
+
+  // app.js ya se cargó antes que este módulo; si la vista actual es la biblioteca,
+  // refrescarla inmediatamente para que las portadas aparezcan sin navegar primero.
+  if(document.querySelector('.tabs button[data-view="home"]')?.classList.contains('active')) window.renderHome();
 })();
