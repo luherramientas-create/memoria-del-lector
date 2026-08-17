@@ -13,6 +13,7 @@ body{overflow:hidden}
 .controls{margin-left:auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .top button{border:1px solid #3a4664;background:#18213a;color:#fff;border-radius:8px;padding:7px 10px;cursor:pointer}
 .top button:hover{background:#202c49}.top button.active{border-color:#a9b9ef;background:#293759}
+.nav-btn{border-color:#56688f!important;background:#202d4a!important}
 .zoom-readout,.depth-label{min-width:50px;text-align:center;font-size:12px;opacity:.8}
 .wrap{height:calc(100% - 58px);position:relative;overflow:hidden}
 svg{width:100%;height:100%;display:block;touch-action:none;cursor:grab}.wrap.panning svg{cursor:grabbing}
@@ -32,6 +33,8 @@ svg{width:100%;height:100%;display:block;touch-action:none;cursor:grab}.wrap.pan
   <h1>🧠 Mapa neuronal</h1>
   <span id="bookInfo">DATOS REALES · experimental</span>
   <div class="controls">
+    <button class="nav-btn" id="normalMap" title="Volver al mapa tradicional">🕸️ Mapa normal</button>
+    <button class="nav-btn" id="mainApp" title="Volver a Memoria del Lector">← Memoria del Lector</button>
     <span class="depth-label">Explorar</span>
     <button class="depthBtn active" data-depth="0">Toda</button>
     <button class="depthBtn" data-depth="1">1</button>
@@ -108,15 +111,10 @@ function adjacency(){const map=new Map(nodes.map(n=>[n.id,[]]));for(const e of e
 function nodesWithinDepth(start,maxDepth){if(!start||maxDepth<=0)return new Set(start?[start]:[]);const adj=adjacency(),seen=new Set([start]),queue=[[start,0]];while(queue.length){const [id,d]=queue.shift();if(d>=maxDepth)continue;for(const next of (adj.get(id)||[])){if(!seen.has(next)){seen.add(next);queue.push([next,d+1])}}}return seen}
 function visibleIds(){if(selected===null||depth===0)return new Set(nodes.map(n=>n.id));return nodesWithinDepth(selected,depth)}
 function edgeVisible(e,visible){return visible.has(e.a)&&visible.has(e.b)}
-function relatedToSelected(e){return selected===null||e.a===selected||e.b===selected}
 function updateDepthButtons(){document.querySelectorAll('.depthBtn').forEach(b=>b.classList.toggle('active',+b.dataset.depth===depth));depthInfo.textContent=depth===0?'Toda la red':`${depth} nivel${depth>1?'es':''}`}
 function render(){
   world.innerHTML='';if(!nodes.length){updateTransform();return}const visible=visibleIds();visibleInfo.textContent=`${visible.size}/${nodes.length} personajes`;const eg=document.createElementNS(NS,'g');
-  edges.forEach((e,i)=>{const a=nodes.find(n=>n.id===e.a),b=nodes.find(n=>n.id===e.b);if(!a||!b)return;const p=document.createElementNS(NS,'path');p.classList.add('edge');if(e.symmetric&&!e.directedAtoB&&!e.directedBtoA)p.classList.add('bi');if(e.directedAtoB)p.setAttribute('marker-end','url(#arrowEnd)');if(e.directedBtoA)p.setAttribute('marker-start','url(#arrowEnd)');
-    if(!edgeVisible(e,visible))p.classList.add('dim');
-    if(edgeVisible(e,visible)&&selected!==null&&(e.a===selected||e.b===selected))p.classList.add('focus');
-    p.setAttribute('d',path(a,b));p.dataset.i=i;p.addEventListener('mouseenter',edgeEnter);p.addEventListener('mouseleave',()=>tip.style.display='none');eg.appendChild(p)});
-  world.appendChild(eg);
+  edges.forEach((e,i)=>{const a=nodes.find(n=>n.id===e.a),b=nodes.find(n=>n.id===e.b);if(!a||!b)return;const p=document.createElementNS(NS,'path');p.classList.add('edge');if(e.symmetric&&!e.directedAtoB&&!e.directedBtoA)p.classList.add('bi');if(e.directedAtoB)p.setAttribute('marker-end','url(#arrowEnd)');if(e.directedBtoA)p.setAttribute('marker-start','url(#arrowEnd)');if(!edgeVisible(e,visible))p.classList.add('dim');if(edgeVisible(e,visible)&&selected!==null&&(e.a===selected||e.b===selected))p.classList.add('focus');p.setAttribute('d',path(a,b));p.dataset.i=i;p.addEventListener('mouseenter',edgeEnter);p.addEventListener('mouseleave',()=>tip.style.display='none');eg.appendChild(p)});world.appendChild(eg);
   nodes.forEach(n=>{const ng=document.createElementNS(NS,'g');ng.classList.add('node');if(!visible.has(n.id))ng.classList.add('dim');if(selected===n.id)ng.classList.add('selected');ng.setAttribute('transform',`translate(${n.x},${n.y})`);const c=document.createElementNS(NS,'circle');c.setAttribute('r',n.r);ng.appendChild(c);const t=document.createElementNS(NS,'text');t.textContent=n.short||n.name;t.setAttribute('y',n.r+18);ng.appendChild(t);ng.addEventListener('mouseenter',e=>nodeEnter(e,n));ng.addEventListener('mouseleave',()=>tip.style.display='none');ng.addEventListener('pointerdown',e=>startDrag(e,n));ng.addEventListener('click',e=>{if(n._moved)return;selected=selected===n.id?null:n.id;if(selected===null)depth=0;updateDepthButtons();render()});world.appendChild(ng)});updateTransform();
 }
 function placeTip(e){const r=wrap.getBoundingClientRect(),x=e.clientX-r.left+12,y=e.clientY-r.top+12;tip.style.left=Math.min(Math.max(8,x),Math.max(8,W-340))+'px';tip.style.top=Math.min(Math.max(8,y),Math.max(8,H-150))+'px'}
@@ -127,6 +125,8 @@ function startDrag(e,n){e.stopPropagation();n._sx=e.clientX;n._sy=e.clientY;n._m
 function startPan(e){if(e.target!==svg)return;panStart={sx:e.clientX,sy:e.clientY,px:pan.x,py:pan.y};wrap.classList.add('panning');const move=ev=>{pan.x=panStart.px+(ev.clientX-panStart.sx);pan.y=panStart.py+(ev.clientY-panStart.sy);updateTransform()};const up=()=>{panStart=null;wrap.classList.remove('panning');window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up)};window.addEventListener('pointermove',move);window.addEventListener('pointerup',up,{once:true})}
 function zoomAt(factor,cx=W/2,cy=H/2){const old=scale,next=Math.max(.35,Math.min(2.5,old*factor));if(next===old)return;const r=svg.getBoundingClientRect(),sx=cx-r.left,sy=cy-r.top;pan.x=sx-(sx-pan.x)*(next/old);pan.y=sy-(sy-pan.y)*(next/old);scale=next;updateTransform()}
 function fitView(){if(!nodes.length){updateTransform();return}let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;nodes.forEach(n=>{minX=Math.min(minX,n.x-n.r);maxX=Math.max(maxX,n.x+n.r,labelWidth(n)/2);minY=Math.min(minY,n.y-n.r-18);maxY=Math.max(maxY,n.y+n.r+18)});const bw=Math.max(1,maxX-minX),bh=Math.max(1,maxY-minY),margin=70;scale=Math.max(.35,Math.min(2.5,Math.min((W-margin*2)/bw,(H-margin*2)/bh)));pan.x=W/2-((minX+maxX)/2)*scale;pan.y=H/2-((minY+maxY)/2)*scale;updateTransform()}
+document.getElementById('normalMap').onclick=()=>{window.location.href='index.html#map'};
+document.getElementById('mainApp').onclick=()=>{window.location.href='index.html'};
 document.querySelectorAll('.depthBtn').forEach(btn=>btn.onclick=()=>{if(selected===null&&+btn.dataset.depth>0){status.textContent='Selecciona primero un personaje para explorar por niveles.';return}depth=+btn.dataset.depth;updateDepthButtons();render()});
 document.getElementById('minus').onclick=()=>zoomAt(.85);document.getElementById('plus').onclick=()=>zoomAt(1.18);document.getElementById('fit').onclick=fitView;document.getElementById('reset').onclick=()=>{layoutNodes();render();fitView()};svg.addEventListener('pointerdown',startPan);svg.addEventListener('wheel',e=>{e.preventDefault();zoomAt(e.deltaY<0?1.12:.89,e.clientX,e.clientY)},{passive:false});window.addEventListener('resize',()=>{size();fitView()});size();build();
 </script>
