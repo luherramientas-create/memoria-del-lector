@@ -5,6 +5,16 @@
   const MAX_BYTES = 250 * 1024;
   const MAX_W = 300, MAX_H = 450;
 
+  const style=document.createElement('style');
+  style.textContent=`
+    .book-cover.has-cover,.book-cover-preview{overflow:hidden;position:relative}
+    .book-cover.has-cover img{width:100%;height:100%;display:block;object-fit:cover}
+    .book-cover-preview{width:120px;height:180px;border-radius:12px;background:linear-gradient(145deg,#5b4b8a,#9a86cb);display:grid;place-items:center;color:#fff;font-size:30px;margin-top:8px;overflow:hidden}
+    .book-cover-preview img{width:100%;height:100%;display:block;object-fit:cover}
+    .cover-editor-preview{min-height:10px}
+  `;
+  document.head.appendChild(style);
+
   function formatBytes(n){ return Math.round(n/1024) + ' KB'; }
   function dataUrlBytes(dataUrl){
     const base64 = String(dataUrl).split(',')[1] || '';
@@ -31,15 +41,9 @@
           ctx.drawImage(img,0,0,w,h);
           let quality=.84;
           let data=canvas.toDataURL('image/webp',quality);
-          if(dataUrlBytes(data)>MAX_BYTES){
-            quality=.68; data=canvas.toDataURL('image/webp',quality);
-          }
-          if(dataUrlBytes(data)>MAX_BYTES){
-            quality=.55; data=canvas.toDataURL('image/jpeg',quality);
-          }
-          if(dataUrlBytes(data)>MAX_BYTES){
-            quality=.42; data=canvas.toDataURL('image/jpeg',quality);
-          }
+          if(dataUrlBytes(data)>MAX_BYTES){ quality=.68; data=canvas.toDataURL('image/webp',quality); }
+          if(dataUrlBytes(data)>MAX_BYTES){ quality=.55; data=canvas.toDataURL('image/jpeg',quality); }
+          if(dataUrlBytes(data)>MAX_BYTES){ quality=.42; data=canvas.toDataURL('image/jpeg',quality); }
           resolve({data,width:w,height:h,bytes:dataUrlBytes(data)});
         };
         img.src=reader.result;
@@ -56,7 +60,7 @@
   function coverField(b){
     return `<div class="field"><label>Portada del libro <span class="muted">(opcional)</span></label>
       <input id="bookCoverFile" type="file" accept="image/jpeg,image/png,image/webp">
-      <div id="bookCoverPreview" class="cover-editor-preview">${coverMarkup(b,'book-cover-preview')}</div>
+      <div id="bookCoverPreview" class="cover-editor-preview">${b&&b.cover?`<div class="book-cover-preview has-cover"><img src="${b.cover}" alt="Portada actual de ${esc(b.title)}"></div>`:'<div class="book-cover-preview">📖</div>'}</div>
       <div class="actions"><button type="button" class="secondary" onclick="previewBookCover()">Previsualizar</button>${b&&b.cover?`<button type="button" class="secondary" onclick="removeBookCover()">Eliminar portada</button>`:''}</div>
       <div id="bookCoverStatus" class="muted">JPG, PNG o WebP. Se optimizará localmente antes de guardarse.</div>
     </div>`;
@@ -70,7 +74,7 @@
       if(status) status.textContent='Procesando imagen…';
       const result=await processCover(input.files[0]);
       window.__pendingBookCover=result.data;
-      if(preview) preview.innerHTML=`<img src="${result.data}" alt="Previsualización de portada">`;
+      if(preview) preview.innerHTML=`<div class="book-cover-preview has-cover"><img src="${result.data}" alt="Previsualización de portada"></div>`;
       if(status) status.textContent=`Portada lista · ${result.width}×${result.height} · ${formatBytes(result.bytes)} · guardado local`;
     }catch(err){ window.__pendingBookCover=null; if(status) status.textContent=err.message; }
   };
@@ -82,11 +86,6 @@
     if(preview) preview.innerHTML='<div class="book-cover-preview">📖</div>';
     if(status) status.textContent='La portada se eliminará al guardar.';
   };
-
-  const originalNewBook=window.newBook;
-  const originalEditBook=window.editBook;
-  const originalCreateBook=window.createBook;
-  const originalUpdateBook=window.updateBook;
 
   window.newBook=function(){
     modal(`<h2>Nuevo libro</h2><form onsubmit="createBook(event)"><div class="field"><label>Título</label><input name="title" required></div><div class="field"><label>Autor</label><input name="author"></div>${coverField(null)}<div class="field"><label>Notas iniciales</label><textarea name="notes" placeholder="¿Por qué lo estás leyendo?"></textarea></div><button class="primary">Crear libro</button></form>`);
@@ -104,7 +103,8 @@
     const f=new FormData(e.target);
     const b={id:uid(),title:f.get('title'),author:f.get('author'),notes:f.get('notes'),characters:[],relationships:[],quotes:[],sessions:[]};
     if(window.__pendingBookCover && window.__pendingBookCover!=='__REMOVE__') b.cover=window.__pendingBookCover;
-    state.books.push(b);state.activeBookId=b.id;save();close();window.__pendingBookCover=null;view('recap');
+    try{ state.books.push(b);state.activeBookId=b.id;save();close();window.__pendingBookCover=null;view('recap'); }
+    catch(err){ toast('No se pudo guardar el libro. Prueba con una portada más pequeña.'); }
   };
 
   window.updateBook=async function(e,id){
@@ -125,6 +125,5 @@
     app.innerHTML=`<div class="section-title"><div><h2>Mis libros</h2><div class="muted">${state.books.length} libro(s)</div></div><button class="primary" onclick="newBook()">+ Libro</button></div><div class="grid">${state.books.map(b=>{const last=b.sessions?.at(-1);return `<div class="card"><div class="book-row">${coverMarkup(b)}<div><h3>${esc(b.title)}</h3><div class="muted">${esc(b.author||'Autor no registrado')}</div><div class="tag">${b.sessions?.length||0} sesión(es)</div></div></div>${last?`<div class="hint"><strong>Última sesión de lectura</strong><br>${esc(last.date)} · ${esc(sessionPoint(last))}${sessionBrief(last)?`<br>${esc(sessionBrief(last).slice(0,120))}${sessionBrief(last).length>120?'…':''}`:''}</div>`:`<div class="muted">Aún no hay sesiones registradas.</div>`}<div class="actions"><button class="primary" onclick="selectBook('${b.id}')">${last?'Retomar lectura':'Abrir'}</button><button class="secondary" onclick="editBook('${b.id}')">Editar</button></div></div>`}).join('')}</div>`;
   };
 
-  // Evita que un handler de carga parcial deje una portada pendiente entre modales.
   document.addEventListener('change',e=>{ if(e.target && e.target.id==='bookCoverFile'){ window.__pendingBookCover=null; const s=document.getElementById('bookCoverStatus'); if(s)s.textContent='Imagen seleccionada. Pulsa “Previsualizar” para procesarla.'; }});
 })();
