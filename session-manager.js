@@ -2,12 +2,29 @@
 (function(){
   const draft={characters:[],relations:[]};
   const editDraft={sessionId:null,chapter:'',page:'',summary:'',note:'',characters:[],relations:[]};
+
+  // Internal dependency adapter: delegates to the existing global implementations.
+  // No business logic is duplicated and no global API is removed.
+  const api={
+    active:(...args)=>active(...args),
+    save:(...args)=>save(...args),
+    uid:(...args)=>uid(...args),
+    modal:(...args)=>modal(...args),
+    close:(...args)=>close(...args),
+    toast:(...args)=>toast(...args),
+    inferRel:(...args)=>inferRel(...args),
+    relationshipLabelNormalize:(...args)=>relationshipLabelNormalize(...args),
+    relationshipExists:(...args)=>relationshipExists(...args),
+    normalizeCharacterText:(...args)=>normalizeCharacterText(...args),
+    renderSessions:(...args)=>renderSessions(...args)
+  };
+
   const esc2=s=>String(s??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#039;'}[c]));
-  const book=()=>typeof active==='function'?active():null;
+  const book=()=>api.active();
   const relationLabel=r=>(r.items||[]).map(i=>i.label).join(' · ')||'otra relación';
   const relationArrow=r=>{const sym=(r.items||[]).some(i=>i.mode==='symmetric'),dir=(r.items||[]).some(i=>i.mode==='directed');return sym&&!dir?'↔':'→'};
-  const catalogInfo=label=>typeof inferRel==='function'?inferRel(label):{mode:'directed',category:'Otra'};
-  const normalizeLabel=v=>typeof relationshipLabelNormalize==='function'?relationshipLabelNormalize(v):String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLocaleLowerCase('es').replace(/\s+/g,' ');
+  const catalogInfo=label=>api.inferRel(label);
+  const normalizeLabel=v=>api.relationshipLabelNormalize(v);
   function resetDraft(){draft.characters=[];draft.relations=[]}
   function resetEditDraft(){Object.assign(editDraft,{sessionId:null,chapter:'',page:'',summary:'',note:'',characters:[],relations:[]})}
   function getDraftContext(){return editDraft.sessionId?editDraft:draft}
@@ -29,7 +46,7 @@
   }
 
   function openSessionForm(title,ctx,onsubmit,sessionId){
-    modal(`<h2>📖 ${title}</h2><form id="sessionV2Form" onsubmit="${onsubmit}">
+    api.modal(`<h2>📖 ${title}</h2><form id="sessionV2Form" onsubmit="${onsubmit}">
       <div class="grid"><div class="field"><label>Capítulo</label><input name="chapter" type="number" min="0" value="${esc2(ctx.chapter)}" required></div><div class="field"><label>Página</label><input name="page" type="number" min="0" value="${esc2(ctx.page)}"></div></div>
       <div class="field"><label>📖 Trama</label><textarea name="summary" placeholder="¿Qué ocurre en este capítulo?">${esc2(ctx.summary)}</textarea></div>
       <div class="field"><label>💭 Mi impresión</label><textarea name="note">${esc2(ctx.note)}</textarea></div>
@@ -51,7 +68,7 @@
 
   function editSession(id){
     const b=book(),s=b?.sessions?.find(x=>x.id===id);
-    if(!b||!s){toast('No se encontró la sesión.');return}
+    if(!b||!s){api.toast('No se encontró la sesión.');return}
     resetEditDraft();
     editDraft.sessionId=s.id;
     editDraft.chapter=s.chapter??'';
@@ -71,7 +88,7 @@
     openSessionForm('Editar sesión de lectura',editDraft,'updateSession(event)',s.id);
   }
 
-  function closeSessionEditor(){resetDraft();resetEditDraft();close()}
+  function closeSessionEditor(){resetDraft();resetEditDraft();api.close()}
 
   function currentFormChapter(){return document.querySelector('#sessionV2Form [name=chapter]')?.value||''}
   function currentContext(){return editDraft.sessionId?editDraft:draft}
@@ -95,7 +112,7 @@
   function sessionAddRelation(){
     const b=book(),ctx=currentContext();
     const all=allDraftCharacters();
-    if(all.length<2){toast('Primero agrega o selecciona al menos dos personajes.');return}
+    if(all.length<2){api.toast('Primero agrega o selecciona al menos dos personajes.');return}
     ctx.relations.push({id:'draftr_'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),originalId:null,from:all[0]?.id||'',to:all[1]?.id||'',label:'',mode:'directed',modeManuallySet:false,chapter:currentFormChapter(),category:'Otra'});
     renderDraft();
   }
@@ -133,9 +150,9 @@
     ctx.characters.forEach(c=>{
       if(!c.name.trim())return;
       if(!String(c.id).startsWith('draftc_')){idMap.set(c.id,c.id);return}
-      const existing=(b.characters||[]).find(x=>typeof normalizeCharacterText==='function'&&normalizeCharacterText(x.name)===normalizeCharacterText(c.name));
+      const existing=(b.characters||[]).find(x=>api.normalizeCharacterText(x.name)===api.normalizeCharacterText(c.name));
       if(existing){idMap.set(c.id,existing.id);return}
-      const obj={id:uid(),name:c.name.trim(),shortName:c.shortName.trim(),description:c.description.trim(),firstChapter:chapter||c.firstChapter||''};
+      const obj={id:api.uid(),name:c.name.trim(),shortName:c.shortName.trim(),description:c.description.trim(),firstChapter:chapter||c.firstChapter||''};
       b.characters.push(obj);idMap.set(c.id,obj.id);
     });
     return idMap;
@@ -150,14 +167,13 @@
   }
 
   function findRelationshipForSession(b,candidate,excludeId){
-    if(typeof relationshipExists!=='function')return null;
-    return relationshipExists(b,candidate,excludeId)||null;
+    return api.relationshipExists(b,candidate,excludeId)||null;
   }
 
   function createSession(e){
     e.preventDefault();
     const f=new FormData(e.target),b=book();if(!b)return;
-    const chapter=f.get('chapter')||'',page=f.get('page')||'',sessionId=uid();
+    const chapter=f.get('chapter')||'',page=f.get('page')||'',sessionId=api.uid();
     const ctx=draft,idMap=resolveDraftCharacters(b,ctx,chapter),findId=id=>idMap.get(id)||id;
     const charIds=[...new Set(ctx.characters.map(c=>findId(c.id)).filter(id=>id&&!String(id).startsWith('draftc_')))];
     const relationshipIds=[],errors=[];
@@ -165,12 +181,12 @@
       const candidate=relationshipCandidate(r,b,idMap,chapter,sessionId);if(candidate.error){errors.push(candidate.error);return}
       const dup=findRelationshipForSession(b,candidate,null);
       if(dup){relationshipIds.push(dup.id);return}
-      const data={id:uid(),from:candidate.from,to:candidate.to,items:[{label:candidate.label,mode:candidate.mode,category:candidate.category}],types:[candidate.label],chapter,discoveryPoint:`Capítulo ${chapter}`,sessionId};
+      const data={id:api.uid(),from:candidate.from,to:candidate.to,items:[{label:candidate.label,mode:candidate.mode,category:candidate.category}],types:[candidate.label],chapter,discoveryPoint:`Capítulo ${chapter}`,sessionId};
       b.relationships.push(data);relationshipIds.push(data.id);
     });
-    if(errors.length){toast('Hay relaciones incompletas. Revisa Personaje A, Personaje B y Relación.');return}
+    if(errors.length){api.toast('Hay relaciones incompletas. Revisa Personaje A, Personaje B y Relación.');return}
     const session={id:sessionId,date:new Date().toLocaleString('es-CR'),chapter,page,summary:f.get('summary'),note:f.get('note'),plot:f.get('summary'),impression:f.get('note'),sessionType:'chapter',characterIds:charIds,relationshipIds:[...new Set(relationshipIds)],quoteIds:[],context:'',pointStart:`Capítulo ${chapter}`,pointEnd:`Capítulo ${chapter}${page?` · pág. ${page}`:''}`};
-    b.sessions.push(session);save();closeSessionEditor();renderSessions();toast('Sesión guardada con personajes y relaciones');
+    b.sessions.push(session);api.save();closeSessionEditor();api.renderSessions();api.toast('Sesión guardada con personajes y relaciones');
   }
 
   function updateSession(e){
@@ -190,7 +206,7 @@
           const same=String(existing.from)===String(candidate.from)&&String(existing.to)===String(candidate.to)&&normalizeLabel(relationLabel(existing))===normalizeLabel(candidate.label)&&relationArrow(existing)===(candidate.mode==='symmetric'?'↔':'→');
           if(otherSessions.length){
             if(same){newRelationshipIds.push(existing.id);currentIds.add(existing.id);return}
-            const data={id:uid(),from:candidate.from,to:candidate.to,items:[{label:candidate.label,mode:candidate.mode,category:candidate.category}],types:[candidate.label],chapter,discoveryPoint:`Capítulo ${chapter}`,sessionId:s.id};
+            const data={id:api.uid(),from:candidate.from,to:candidate.to,items:[{label:candidate.label,mode:candidate.mode,category:candidate.category}],types:[candidate.label],chapter,discoveryPoint:`Capítulo ${chapter}`,sessionId:s.id};
             b.relationships.push(data);newRelationshipIds.push(data.id);currentIds.add(data.id);return;
           }
           existing.from=candidate.from;existing.to=candidate.to;existing.items=[{label:candidate.label,mode:candidate.mode,category:candidate.category}];existing.types=[candidate.label];existing.chapter=chapter;existing.discoveryPoint=`Capítulo ${chapter}`;existing.sessionId=existing.sessionId||s.id;
@@ -199,12 +215,12 @@
       }
       const dup=findRelationshipForSession(b,candidate,originalId);
       if(dup){newRelationshipIds.push(dup.id);currentIds.add(dup.id);return}
-      const data={id:uid(),from:candidate.from,to:candidate.to,items:[{label:candidate.label,mode:candidate.mode,category:candidate.category}],types:[candidate.label],chapter,discoveryPoint:`Capítulo ${chapter}`,sessionId:s.id};
+      const data={id:api.uid(),from:candidate.from,to:candidate.to,items:[{label:candidate.label,mode:candidate.mode,category:candidate.category}],types:[candidate.label],chapter,discoveryPoint:`Capítulo ${chapter}`,sessionId:s.id};
       b.relationships.push(data);newRelationshipIds.push(data.id);currentIds.add(data.id);
     });
-    if(errors.length){toast('Hay relaciones incompletas. Revisa Personaje A, Personaje B y Relación.');return}
+    if(errors.length){api.toast('Hay relaciones incompletas. Revisa Personaje A, Personaje B y Relación.');return}
     s.chapter=chapter;s.page=page;s.summary=f.get('summary');s.note=f.get('note');s.plot=f.get('summary');s.impression=f.get('note');s.characterIds=charIds;s.relationshipIds=[...new Set(newRelationshipIds)];s.pointStart=`Capítulo ${chapter}`;s.pointEnd=`Capítulo ${chapter}${page?` · pág. ${page}`:''}`;
-    save();closeSessionEditor();renderSessions();toast('Sesión actualizada correctamente');
+    api.save();closeSessionEditor();api.renderSessions();api.toast('Sesión actualizada correctamente');
   }
 
   function renderSessions(){
