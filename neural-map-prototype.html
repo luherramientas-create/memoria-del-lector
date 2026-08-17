@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>🧠 Mapa neuronal — prototipo</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;height:100%;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#0b1020;color:#e9edf7}body{overflow:hidden}.top{height:58px;display:flex;align-items:center;gap:12px;padding:0 16px;background:#11182b;border-bottom:1px solid #26304a}.top h1{font-size:16px;margin:0}.top span{font-size:12px;opacity:.65}.top button{margin-left:auto;border:1px solid #3a4664;background:#18213a;color:#fff;border-radius:8px;padding:8px 12px;cursor:pointer}.wrap{height:calc(100% - 58px);position:relative}svg{width:100%;height:100%;display:block;touch-action:none}.edge{fill:none;stroke:#6576a5;stroke-width:2;opacity:.62}.edge.bi{stroke-dasharray:5 4}.node{cursor:grab}.node:active{cursor:grabbing}.node circle{fill:#17223c;stroke:#8da2d7;stroke-width:2}.node text{fill:#f2f5ff;font-size:12px;pointer-events:none;text-anchor:middle;dominant-baseline:central}.node.selected circle{stroke:#fff;stroke-width:3;filter:drop-shadow(0 0 8px rgba(150,180,255,.75))}.node.dim,.edge.dim{opacity:.13}.tooltip{position:absolute;display:none;max-width:240px;padding:9px 11px;border:1px solid #3c4b70;background:#151e35;border-radius:9px;box-shadow:0 8px 30px #0008;font-size:13px;pointer-events:none}.tooltip strong{display:block;margin-bottom:4px}.hint{position:absolute;left:14px;bottom:14px;padding:8px 10px;border-radius:8px;background:#11182bcc;border:1px solid #2c3753;font-size:12px;opacity:.8}
+</style>
+</head>
+<body>
+<div class="top"><h1>🧠 Mapa neuronal</h1><span>PROTOTIPO EXPERIMENTAL · datos ficticios</span><button id="reset">Reorganizar</button></div>
+<div class="wrap"><svg id="graph" aria-label="Prototipo de red neuronal"></svg><div id="tip" class="tooltip"></div><div class="hint">Arrastra nodos · pasa el mouse sobre una conexión · haz clic en un personaje</div></div>
+<script>
+const svg=document.getElementById('graph'), tip=document.getElementById('tip');
+const names=['Alicia','Bruno','Clara','Diego','Elena','Fabián','Gabriela','Hugo','Irene','Javier','Karla','Luis','Marta','Nicolás'];
+const links=[
+ [0,1,'amigo/a de','bi'],[0,2,'colega de','bi'],[0,3,'hermano de','bi'],[1,2,'amigo/a de','bi'],[1,4,'jefe de','dir'],[2,5,'profesor/a de','dir'],[2,6,'amigo/a de','bi'],[3,7,'rival de','bi'],[4,8,'empleado/a de','dir'],[5,8,'mentor de','dir'],[5,9,'amigo/a de','bi'],[6,9,'colega de','bi'],[6,10,'enemigo/a de','bi'],[7,10,'amigo/a de','bi'],[8,11,'conocido/a de','bi'],[9,12,'pareja de','bi'],[10,13,'socio/a de','bi'],[11,12,'amigo/a de','bi'],[12,13,'colega de','bi']
+];
+let W=0,H=0,nodes=[],selected=null,drag=null;
+function size(){const r=svg.getBoundingClientRect();W=r.width;H=r.height}
+function init(){size();nodes=names.map((name,i)=>({id:i,name,x:W*.5+Math.cos(i/names.length*Math.PI*2)*Math.min(W,H)*.25,y:H*.5+Math.sin(i/names.length*Math.PI*2)*Math.min(W,H)*.25,vx:0,vy:0,r:14+(i%3)*2}));render();for(let i=0;i<260;i++)tick(.45);render()}
+function tick(dt){for(const a of nodes){if(a===drag)continue;a.vx*=.88;a.vy*=.88;a.vx+=(W/2-a.x)*.0009*dt;a.vy+=(H/2-a.y)*.0009*dt;for(const b of nodes){if(a===b)continue;let dx=a.x-b.x,dy=a.y-b.y,d2=dx*dx+dy*dy+80, f=15000/d2;a.vx+=dx*f*dt/Math.max(W,400);a.vy+=dy*f*dt/Math.max(H,300)}}for(const l of links){const a=nodes[l[0]],b=nodes[l[1]],dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy)||1,f=(d-145)*.0018*dt;a.vx+=dx/d*f;a.vy+=dy/d*f;b.vx-=dx/d*f;b.vy-=dy/d*f}for(const a of nodes){if(a===drag)continue;a.x+=a.vx*dt;a.y+=a.vy*dt;a.x=Math.max(35,Math.min(W-35,a.x));a.y=Math.max(35,Math.min(H-35,a.y))}}
+function path(a,b){const dx=b.x-a.x,dy=b.y-a.y,mx=(a.x+b.x)/2,my=(a.y+b.y)/2,off=Math.min(55,Math.hypot(dx,dy)*.18);const nx=-dy/(Math.hypot(dx,dy)||1),ny=dx/(Math.hypot(dx,dy)||1);return `M${a.x},${a.y} Q${mx+nx*off},${my+ny*off} ${b.x},${b.y}`}
+function render(){svg.innerHTML='';const g=document.createElementNS('http://www.w3.org/2000/svg','g');for(const l of links){const p=document.createElementNS('http://www.w3.org/2000/svg','path');p.classList.add('edge');if(l[3]==='bi')p.classList.add('bi');p.setAttribute('d',path(nodes[l[0]],nodes[l[1]]));p.dataset.i=links.indexOf(l);p.addEventListener('mouseenter',edgeEnter);p.addEventListener('mouseleave',()=>tip.style.display='none');g.appendChild(p)}svg.appendChild(g);for(const n of nodes){const ng=document.createElementNS('http://www.w3.org/2000/svg','g');ng.classList.add('node');if(selected!==null&&selected!==n.id)ng.classList.add('dim');if(selected===n.id)ng.classList.add('selected');ng.setAttribute('transform',`translate(${n.x},${n.y})`);const c=document.createElementNS('http://www.w3.org/2000/svg','circle');c.setAttribute('r',n.r);ng.appendChild(c);const t=document.createElementNS('http://www.w3.org/2000/svg','text');t.textContent=n.name; t.setAttribute('y',n.r+17);ng.appendChild(t);ng.addEventListener('mousedown',e=>startDrag(e,n));ng.addEventListener('click',e=>{if(Math.abs(e.clientX-(n._sx||e.clientX))<5){selected=selected===n.id?null:n.id;render()}});svg.appendChild(ng)}}
+function edgeEnter(e){const l=links[+e.currentTarget.dataset.i],rel=l[2];tip.innerHTML=`<strong>${nodes[l[0]].name} ↔ ${nodes[l[1]].name}</strong>${rel}`;tip.style.display='block';const r=svg.getBoundingClientRect();tip.style.left=Math.min(e.clientX-r.left+12,W-250)+'px';tip.style.top=Math.min(e.clientY-r.top+12,H-80)+'px';e.currentTarget.classList.remove('dim')}
+function startDrag(e,n){n._sx=e.clientX;n._sy=e.clientY;drag=n;const move=ev=>{const r=svg.getBoundingClientRect();n.x=Math.max(25,Math.min(W-25,ev.clientX-r.left));n.y=Math.max(25,Math.min(H-25,ev.clientY-r.top));render()};const up=()=>{drag=null;window.removeEventListener('mousemove',move);window.removeEventListener('mouseup',up)};window.addEventListener('mousemove',move);window.addEventListener('mouseup',up)}
+document.getElementById('reset').onclick=()=>{init()};window.addEventListener('resize',()=>{size();render()});init();
+</script>
+</body>
+</html>
