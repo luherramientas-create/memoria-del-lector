@@ -12,6 +12,7 @@
     modal:(...args)=>modal(...args),
     close:(...args)=>close(...args),
     toast:(...args)=>toast(...args),
+    esc:(...args)=>esc(...args),
     inferRel:(...args)=>inferRel(...args),
     relationshipLabelNormalize:(...args)=>relationshipLabelNormalize(...args),
     relationshipExists:(...args)=>relationshipExists(...args),
@@ -19,7 +20,6 @@
     renderSessions:(...args)=>renderSessions(...args)
   };
 
-  const esc2=s=>String(s??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#039;'}[c]));
   const book=()=>api.active();
   const relationLabel=r=>(r.items||[]).map(i=>i.label).join(' · ')||'otra relación';
   const relationArrow=r=>{const sym=(r.items||[]).some(i=>i.mode==='symmetric'),dir=(r.items||[]).some(i=>i.mode==='directed');return sym&&!dir?'↔':'→'};
@@ -35,21 +35,21 @@
     const custom=(ctx?.relations||[]).map(r=>String(r.label||'').trim()).filter(Boolean);
     return [...new Set([...types,...custom].map(x=>String(x).trim()).filter(Boolean))];
   }
-  function relationTypesMarkup(ctx){return relationSuggestions(ctx).map(x=>`<option value="${esc2(x)}"></option>`).join('')}
+  function relationTypesMarkup(ctx){return relationSuggestions(ctx).map(x=>`<option value="${api.esc(x)}"></option>`).join('')}
   function relationModeForLabel(label){const info=catalogInfo(label);return {mode:info?.mode||'directed',category:info?.category||'Otra'}}
   function updateRelationModeFromLabel(r,label){if(r.modeManuallySet)return;r.mode=relationModeForLabel(label).mode}
   function characterOptions(selected,ctx){
     const b=book();
     const all=[...(b?.characters||[]),...(ctx?.characters||[]).filter(c=>c.name.trim())];
     const seen=new Set();
-    return `<option value="">Seleccionar…</option>`+all.filter(c=>{if(seen.has(c.id))return false;seen.add(c.id);return true}).map(c=>`<option value="${esc2(c.id)}" ${c.id===selected?'selected':''}>${esc2(c.name)}</option>`).join('');
+    return `<option value="">Seleccionar…</option>`+all.filter(c=>{if(seen.has(c.id))return false;seen.add(c.id);return true}).map(c=>`<option value="${api.esc(c.id)}" ${c.id===selected?'selected':''}>${api.esc(c.name)}</option>`).join('');
   }
 
   function openSessionForm(title,ctx,onsubmit,sessionId){
     api.modal(`<h2>📖 ${title}</h2><form id="sessionV2Form" onsubmit="${onsubmit}">
-      <div class="grid"><div class="field"><label>Capítulo</label><input name="chapter" type="number" min="0" value="${esc2(ctx.chapter)}" required></div><div class="field"><label>Página</label><input name="page" type="number" min="0" value="${esc2(ctx.page)}"></div></div>
-      <div class="field"><label>📖 Trama</label><textarea name="summary" placeholder="¿Qué ocurre en este capítulo?">${esc2(ctx.summary)}</textarea></div>
-      <div class="field"><label>💭 Mi impresión</label><textarea name="note">${esc2(ctx.note)}</textarea></div>
+      <div class="grid"><div class="field"><label>Capítulo</label><input name="chapter" type="number" min="0" value="${api.esc(ctx.chapter)}" required></div><div class="field"><label>Página</label><input name="page" type="number" min="0" value="${api.esc(ctx.page)}"></div></div>
+      <div class="field"><label>📖 Trama</label><textarea name="summary" placeholder="¿Qué ocurre en este capítulo?">${api.esc(ctx.summary)}</textarea></div>
+      <div class="field"><label>💭 Mi impresión</label><textarea name="note">${api.esc(ctx.note)}</textarea></div>
       <hr>
       <div class="section-title"><div><h3>👥 Personajes descubiertos</h3><div class="muted">Puedes agregar varios sin perder el foco al escribir.</div></div><button type="button" class="secondary" onclick="sessionAddCharacter()">+ Personaje</button></div>
       <div id="sessionCharacters" class="list"><div class="muted">Aún no has agregado personajes.</div></div>
@@ -127,10 +127,10 @@
     const activeId=activeEl?.dataset?.draftId||'';
     const activeStart=activeEl?.selectionStart;
     const activeEnd=activeEl?.selectionEnd;
-    cc.innerHTML=ctx.characters.length?ctx.characters.map(c=>`<div class="card session-draft-character"><div class="grid"><div class="field"><label>Nombre completo</label><input data-draft-id="${esc2(c.id)}" value="${esc2(c.name)}" oninput="sessionUpdateCharacter('${c.id}','name',this.value)" required></div><div class="field"><label>Nombre corto <span class="muted">(opcional)</span></label><input value="${esc2(c.shortName)}" oninput="sessionUpdateCharacter('${c.id}','shortName',this.value)"></div></div><div class="field"><label>Descripción</label><textarea oninput="sessionUpdateCharacter('${c.id}','description',this.value)">${esc2(c.description)}</textarea></div><button type="button" class="danger" onclick="sessionRemoveCharacter('${c.id}')">Eliminar de esta sesión</button></div>`).join(''):'<div class="muted">Aún no has agregado personajes.</div>';
+    cc.innerHTML=ctx.characters.length?ctx.characters.map(c=>`<div class="card session-draft-character"><div class="grid"><div class="field"><label>Nombre completo</label><input data-draft-id="${api.esc(c.id)}" value="${api.esc(c.name)}" oninput="sessionUpdateCharacter('${c.id}','name',this.value)" required></div><div class="field"><label>Nombre corto <span class="muted">(opcional)</span></label><input value="${api.esc(c.shortName)}" oninput="sessionUpdateCharacter('${c.id}','shortName',this.value)"></div></div><div class="field"><label>Descripción</label><textarea oninput="sessionUpdateCharacter('${c.id}','description',this.value)">${api.esc(c.description)}</textarea></div><button type="button" class="danger" onclick="sessionRemoveCharacter('${c.id}')">Eliminar de esta sesión</button></div>`).join(''):'<div class="muted">Aún no has agregado personajes.</div>';
     rr.innerHTML=ctx.relations.length?ctx.relations.map(r=>{
       const catalog=relationModeForLabel(r.label),checkedDir=r.mode!=='symmetric',checkedSym=r.mode==='symmetric';
-      return `<div class="card session-draft-relation"><div class="grid"><div class="field"><label>Personaje A</label><select onchange="sessionUpdateRelation('${r.id}','from',this.value)">${characterOptions(r.from,ctx)}</select></div><div class="field"><label>Personaje B</label><select onchange="sessionUpdateRelation('${r.id}','to',this.value)">${characterOptions(r.to,ctx)}</select></div></div><div class="grid"><div class="field"><label>Relación</label><input list="sessionRelationshipSuggestions" value="${esc2(r.label)}" placeholder="Escribe o selecciona una relación…" oninput="sessionUpdateRelation('${r.id}','label',this.value)"></div><div class="field"><label>Dirección</label><div class="seg"><button type="button" class="${checkedDir?'active':''}" onclick="sessionSetRelationMode('${r.id}','directed')">→ Dirigida</button><button type="button" class="${checkedSym?'active':''}" onclick="sessionSetRelationMode('${r.id}','symmetric')">↔ Simétrica</button></div></div></div><div class="grid"><div class="field"><label>Capítulo descubierto</label><input type="number" min="0" value="${esc2(r.chapter??currentFormChapter())}" disabled></div><div class="field"><label>Categoría</label><input value="${esc2(r.category||catalog.category||'Otra')}" disabled></div></div><button type="button" class="danger" onclick="sessionRemoveRelation('${r.id}')">Eliminar relación</button></div>`;
+      return `<div class="card session-draft-relation"><div class="grid"><div class="field"><label>Personaje A</label><select onchange="sessionUpdateRelation('${r.id}','from',this.value)">${characterOptions(r.from,ctx)}</select></div><div class="field"><label>Personaje B</label><select onchange="sessionUpdateRelation('${r.id}','to',this.value)">${characterOptions(r.to,ctx)}</select></div></div><div class="grid"><div class="field"><label>Relación</label><input list="sessionRelationshipSuggestions" value="${api.esc(r.label)}" placeholder="Escribe o selecciona una relación…" oninput="sessionUpdateRelation('${r.id}','label',this.value)"></div><div class="field"><label>Dirección</label><div class="seg"><button type="button" class="${checkedDir?'active':''}" onclick="sessionSetRelationMode('${r.id}','directed')">→ Dirigida</button><button type="button" class="${checkedSym?'active':''}" onclick="sessionSetRelationMode('${r.id}','symmetric')">↔ Simétrica</button></div></div></div><div class="grid"><div class="field"><label>Capítulo descubierto</label><input type="number" min="0" value="${api.esc(r.chapter??currentFormChapter())}" disabled></div><div class="field"><label>Categoría</label><input value="${api.esc(r.category||catalog.category||'Otra')}" disabled></div></div><button type="button" class="danger" onclick="sessionRemoveRelation('${r.id}')">Eliminar relación</button></div>`;
     }).join(''):'<div class="muted">Aún no has agregado relaciones.</div>';
     let dl=document.getElementById('sessionRelationshipSuggestions');
     if(!dl){dl=document.createElement('datalist');dl.id='sessionRelationshipSuggestions';document.getElementById('sessionV2Form')?.appendChild(dl)}
@@ -225,7 +225,7 @@
 
   function renderSessions(){
     if(!requireBook())return;const b=book();
-    document.getElementById('app').innerHTML=`<div class="section-title"><div><h2>📖 Sesiones de lectura</h2><div class="muted">Registra capítulos, personajes y relaciones descubiertas.</div></div><button class="primary" onclick="newSession()">+ Nueva sesión</button></div>${b.sessions.length?`<div class="list">${b.sessions.slice().reverse().map(s=>{const chars=(s.characterIds||[]).map(id=>b.characters.find(c=>c.id===id)).filter(Boolean),rels=(s.relationshipIds||[]).map(id=>b.relationships.find(r=>r.id===id)).filter(Boolean);return `<div class="card"><div class="section-title"><div><h3>Capítulo ${esc2(s.chapter||'?')} ${s.page?`· pág. ${esc2(s.page)}`:''}</h3><div class="muted">${esc2(s.date||'')}</div></div><button class="secondary" onclick="editSession('${s.id}')">Editar</button></div>${s.summary||s.plot?`<p><strong>📖 Trama:</strong><br>${esc2(s.summary||s.plot)}</p>`:''}${chars.length?`<p><strong>👥 Personajes</strong><br>${chars.map(c=>esc2(c.name)).join(' · ')}</p>`:''}${rels.length?`<div><strong>🔗 Relaciones descubiertas</strong>${rels.map(r=>{const a=b.characters.find(c=>c.id===r.from),z=b.characters.find(c=>c.id===r.to);return `<div class="relationship"><span class="node">${esc2(a?.name||'?')}</span><span class="arrow">— ${esc2(relationLabel(r))} ${relationArrow(r)}</span><span class="node">${esc2(z?.name||'?')}</span></div>`}).join('')}</div>`:''}${s.note||s.impression?`<p><strong>💭 Mi impresión:</strong><br>${esc2(s.note||s.impression)}</p>`:''}</div>`}).join('')}`:`<div class="empty">Aún no has registrado una sesión.</div>`}`;
+    document.getElementById('app').innerHTML=`<div class="section-title"><div><h2>📖 Sesiones de lectura</h2><div class="muted">Registra capítulos, personajes y relaciones descubiertas.</div></div><button class="primary" onclick="newSession()">+ Nueva sesión</button></div>${b.sessions.length?`<div class="list">${b.sessions.slice().reverse().map(s=>{const chars=(s.characterIds||[]).map(id=>b.characters.find(c=>c.id===id)).filter(Boolean),rels=(s.relationshipIds||[]).map(id=>b.relationships.find(r=>r.id===id)).filter(Boolean);return `<div class="card"><div class="section-title"><div><h3>Capítulo ${api.esc(s.chapter||'?')} ${s.page?`· pág. ${api.esc(s.page)}`:''}</h3><div class="muted">${api.esc(s.date||'')}</div></div><button class="secondary" onclick="editSession('${s.id}')">Editar</button></div>${s.summary||s.plot?`<p><strong>📖 Trama:</strong><br>${api.esc(s.summary||s.plot)}</p>`:''}${chars.length?`<p><strong>👥 Personajes</strong><br>${chars.map(c=>api.esc(c.name)).join(' · ')}</p>`:''}${rels.length?`<div><strong>🔗 Relaciones descubiertas</strong>${rels.map(r=>{const a=b.characters.find(c=>c.id===r.from),z=b.characters.find(c=>c.id===r.to);return `<div class="relationship"><span class="node">${api.esc(a?.name||'?')}</span><span class="arrow">— ${api.esc(relationLabel(r))} ${relationArrow(r)}</span><span class="node">${api.esc(z?.name||'?')}</span></div>`}).join('')}</div>`:''}${s.note||s.impression?`<p><strong>💭 Mi impresión:</strong><br>${api.esc(s.note||s.impression)}</p>`:''}</div>`}).join('')}`:`<div class="empty">Aún no has registrado una sesión.</div>`}`;
   }
 
   Object.assign(window,{newSession,editSession,updateSession,createSession,renderSessions,sessionAddCharacter,sessionRemoveCharacter,sessionAddRelation,sessionRemoveRelation,sessionUpdateCharacter,sessionUpdateRelation,sessionSetRelationMode,closeSessionEditor});
