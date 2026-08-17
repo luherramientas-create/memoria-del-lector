@@ -131,3 +131,35 @@
   const app=document.getElementById('app');if(app)observer.observe(app,{subtree:true,childList:true});
   styles();
 })();
+
+/* FASE 6.5 — Integración del mapa neuronal en el módulo Mapas. */
+(function(){
+  function addNeuralToggle(){
+    const toolbar=document.querySelector('#app .map-card .map-toolbar');
+    if(!toolbar || document.getElementById('openNeuralMapBtn')) return;
+    const group=document.createElement('div');
+    group.className='seg';
+    group.style.marginLeft='8px';
+    group.innerHTML='<button id="openNeuralMapBtn" type="button">🧠 Neuronal</button>';
+    group.querySelector('button').addEventListener('click',()=>{
+      window.location.href='neural-map-real.html';
+    });
+    toolbar.appendChild(group);
+  }
+  function install(){
+    addNeuralToggle();
+  }
+  const originalRenderMap=window.renderMap;
+  if(typeof originalRenderMap==='function'){
+    window.renderMap=function(){
+      originalRenderMap.apply(this,arguments);
+      setTimeout(install,0);
+      setTimeout(install,120);
+      setTimeout(install,500);
+    };
+  }
+  const observer=new MutationObserver(()=>{clearTimeout(window.__neuralToggleTimer);window.__neuralToggleTimer=setTimeout(install,40);});
+  const app=document.getElementById('app');
+  if(app)observer.observe(app,{subtree:true,childList:true});
+  install();
+})();
