@@ -1,6 +1,8 @@
 // FASE 7.1 — Mapa móvil en modo ampliado
 (function(){
-  const mq = window.matchMedia('(max-width: 820px)');
+  // Android puede presentar una ventana CSS >820px en landscape.
+  // También detectamos interacción táctil para no depender solo del ancho.
+  const mq = window.matchMedia('(max-width: 1100px), (pointer: coarse)');
   function mapWrap(){ return document.querySelector('.map-wrap'); }
   function install(){
     const wrap=mapWrap(); if(!wrap || wrap.dataset.mobileFsReady==='1') return;
