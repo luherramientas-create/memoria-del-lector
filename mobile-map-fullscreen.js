@@ -3,6 +3,26 @@
   // Android puede presentar una ventana CSS >820px en landscape.
   // También detectamos interacción táctil para no depender solo del ancho.
   const mq = window.matchMedia('(max-width: 1100px), (pointer: coarse)');
+  const style=document.createElement('style');
+  style.textContent=`
+    @media (max-width:1100px), (pointer:coarse){
+      .mobile-map-fs-controls{display:flex!important}
+    }
+    @media (max-width:1100px), (pointer:coarse){
+      body.mobile-map-expanded{overflow:hidden}
+      .mobile-map-expanded .top,.mobile-map-expanded .tabs{display:none}
+      .mobile-map-expanded main{position:fixed;inset:0;z-index:40;max-width:none;margin:0;padding:0;background:var(--bg);overflow:hidden}
+      .mobile-map-expanded .map-shell{display:block;height:100%}
+      .mobile-map-expanded .map-card{height:100%;border-radius:0;border:0;box-shadow:none}
+      .mobile-map-expanded .map-wrap{height:100vh;height:100dvh;min-height:100%;border-top:0}
+      .mobile-map-expanded .map-toolbar{position:absolute;top:0;left:0;right:0;z-index:6;background:#fffffff2;border-bottom:1px solid var(--line);padding:8px;max-height:25vh;overflow:auto}
+      .mobile-map-expanded .map-side{display:none}
+      .mobile-map-expanded .mobile-map-fs-controls{bottom:12px;left:12px}
+      .mobile-map-expanded .zoom-box{top:58px;right:10px}
+      .mobile-map-expanded .map-wrap svg{height:100%}
+    }
+  `;
+  document.head.appendChild(style);
   function mapWrap(){ return document.querySelector('.map-wrap'); }
   function install(){
     const wrap=mapWrap(); if(!wrap || wrap.dataset.mobileFsReady==='1') return;
