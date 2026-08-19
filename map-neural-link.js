@@ -8,7 +8,7 @@
     btn.type='button';
     btn.textContent='🧠 Mapa neuronal';
     btn.title='Abrir la visualización neuronal del libro activo';
-    btn.addEventListener('click',()=>{ window.location.href='neural-map-real.html'; });
+    btn.addEventListener('click',()=>{ window.location.href='neural-map-v2.html?v=7.4'; });
     toolbar.appendChild(btn);
   }
   const observer=new MutationObserver(()=>setTimeout(addNeuralAccess,0));
