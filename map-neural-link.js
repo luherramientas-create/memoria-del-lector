@@ -1,4 +1,4 @@
-/* FASE 6.5 — Acceso integrado al mapa neuronal desde el módulo Mapa. */
+/* FASE 7.5.1 — Acceso integrado al mapa neuronal. */
 (function(){
   function addNeuralAccess(){
     const toolbar=document.querySelector('#app .map-toolbar');
@@ -8,7 +8,7 @@
     btn.type='button';
     btn.textContent='🧠 Mapa neuronal';
     btn.title='Abrir la visualización neuronal del libro activo';
-    btn.addEventListener('click',()=>{ window.location.href='neural-map-v2.html?v=7.4'; });
+    btn.addEventListener('click',()=>{ window.location.href='neural-map-v2.html?v=7.5.1'; });
     toolbar.appendChild(btn);
   }
   const observer=new MutationObserver(()=>setTimeout(addNeuralAccess,0));
