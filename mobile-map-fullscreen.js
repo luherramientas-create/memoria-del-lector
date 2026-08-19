@@ -31,7 +31,7 @@
       .map-toolbar select,.map-toolbar button{flex:none}
       /* Deja espacio entre la navegación sticky y el encabezado del mapa. */
       main{padding-top:22px!important}
-      .map-wrap:not(.mobile-map-expanded .map-wrap) .zoom-box{top:58px!important;right:10px!important}
+      body:not(.mobile-map-expanded) .map-wrap .zoom-box{top:58px!important;right:10px!important}
     }
   `;
   document.head.appendChild(style);
