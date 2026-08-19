@@ -10,7 +10,7 @@
 <script>
 (async()=>{
   try{
-    const res=await fetch('neural-map-real.html?v=7.4.0',{cache:'no-store'});
+    const res=await fetch('neural-map-real.html?v=7.5.0',{cache:'no-store'});
     if(!res.ok) throw new Error('No se pudo cargar el mapa neuronal');
     let html=await res.text();
 
@@ -25,46 +25,66 @@ function labelWidth(n){
 }
 function layoutNodes(){
   if(!nodes.length)return;
-  // Distribución estable por filas: los personajes más conectados ocupan
-  // las posiciones más cercanas al centro. Así se evita el amontonamiento
-  // incluso en pantallas estrechas.
-  const cols=W<460?2:(W<820?3:(W<1100?4:5));
-  const rows=Math.ceil(nodes.length/cols);
-  const xGap=W/(cols+1), yGap=H/(rows+1);
-  const slots=[];
-  for(let r=0;r<rows;r++){
-    for(let c=0;c<cols;c++){
-      if(slots.length>=nodes.length)break;
-      const offset=(r%2&&cols>2)?Math.min(xGap*.12,28):0;
-      slots.push({x:(c+1)*xGap+offset,y:(r+1)*yGap});
+  // Distribución radial por capas. Evita que los personajes terminen
+  // en una sola fila y reserva espacio real para sus nombres.
+  const cx=W/2,cy=H/2;
+  const count=nodes.length;
+  const ordered=[...nodes].sort((a,b)=>{
+    const da=edges.filter(e=>e.a===a.id||e.b===a.id).length;
+    const db=edges.filter(e=>e.a===b.id||e.b===b.id).length;
+    return db-da;
+  });
+  const rings=[];
+  if(count===1) rings.push(1);
+  else if(count<=7) rings.push(count);
+  else {
+    rings.push(1);
+    let remaining=count-1;
+    let ringSize=Math.min(8,remaining);
+    while(remaining>0){
+      const take=Math.min(ringSize,remaining);
+      rings.push(take);
+      remaining-=take;
+      ringSize=Math.min(10,ringSize+2);
     }
   }
-  const cx=W/2,cy=H/2;
-  slots.sort((a,b)=>Math.hypot(a.x-cx,a.y-cy)-Math.hypot(b.x-cx,b.y-cy));
-  const degree=new Map(nodes.map(n=>[n.id,0]));
-  edges.forEach(e=>{degree.set(e.a,(degree.get(e.a)||0)+1);degree.set(e.b,(degree.get(e.b)||0)+1)});
-  const ordered=[...nodes].sort((a,b)=>(degree.get(b.id)||0)-(degree.get(a.id)||0));
-  ordered.forEach((n,i)=>{n.x=slots[i].x;n.y=slots[i].y;n.vx=0;n.vy=0});
-  resolveOverlaps();
-}
-function resolveOverlaps(){
-  for(let pass=0;pass<30;pass++){
+  const maxLabel=Math.max(54,...nodes.map(labelWidth));
+  const minGap=Math.max(34,Math.min(58,maxLabel*0.22));
+  const minRadius=Math.max(95,maxLabel*0.78+40);
+  const maxRadius=Math.max(minRadius,Math.min(W*.43,H*.40));
+  let index=0;
+  rings.forEach((size,ringIndex)=>{
+    if(size===1){
+      const n=ordered[index++];
+      n.x=cx;n.y=cy;n.vx=0;n.vy=0;return;
+    }
+    const radius=Math.min(maxRadius,minRadius+(ringIndex-1)*Math.max(75,minRadius*.68));
+    const start=-Math.PI/2+(ringIndex%2?Math.PI/size:0);
+    for(let i=0;i<size;i++){
+      const n=ordered[index++];
+      const a=start+i*(Math.PI*2/size);
+      n.x=cx+Math.cos(a)*radius;
+      n.y=cy+Math.sin(a)*radius;
+      n.vx=0;n.vy=0;
+    }
+  });
+  // Una pasada corta de repulsión solo para separar etiquetas/nodos,
+  // sin volver a colapsar la red hacia una línea.
+  for(let pass=0;pass<18;pass++){
     let moved=false;
     for(let i=0;i<nodes.length;i++){
       for(let j=i+1;j<nodes.length;j++){
         const a=nodes[i],b=nodes[j];
-        const aw=labelWidth(a)/2+8,bw=labelWidth(b)/2+8;
-        const ah=a.r+22,bh=b.r+22;
-        const ox=(aw+bw)-Math.abs(a.x-b.x),oy=(ah+bh)-Math.abs(a.y-b.y);
-        if(ox>0&&oy>0){
-          if(ox<oy){const dir=a.x<=b.x?-1:1;const push=ox/2;a.x+=dir*push;b.x-=dir*push}
-          else{const dir=a.y<=b.y?-1:1;const push=oy/2;a.y+=dir*push;b.y-=dir*push}
-          moved=true;
+        const minD=(a.r+b.r)+Math.max(minGap,(labelWidth(a)+labelWidth(b))*.30);
+        const dx=a.x-b.x,dy=a.y-b.y,d=Math.hypot(dx,dy)||.1;
+        if(d<minD){
+          const push=(minD-d)/2,ux=dx/d,uy=dy/d;
+          a.x+=ux*push;b.x-=ux*push;a.y+=uy*push;b.y-=uy*push;moved=true;
         }
       }
     }
     for(const n of nodes){
-      const padX=20+labelWidth(n)/2,padY=30+n.r+12;
+      const padX=22+labelWidth(n)/2,padY=35+n.r+18;
       n.x=Math.max(padX,Math.min(W-padX,n.x));
       n.y=Math.max(padY,Math.min(H-padY,n.y));
     }
@@ -72,8 +92,10 @@ function resolveOverlaps(){
   }
 }
 `;
-    html=html.replace(/function layoutNodes\(\)\{[\s\S]*?\n\}\nfunction resolveOverlaps\(\)\{[\s\S]*?\n\}\nfunction path/,layout+'function path');
-    html=html.replace(/function fitView\(\)\{[\s\S]*?\n\}\nfunction touchDistance/,`function fitView(){
+    // Reemplazo robusto: la versión real está minificada en una sola línea,
+    // por lo que no dependemos de saltos de línea alrededor de las funciones.
+    html=html.replace(/function layoutNodes\(\)\{[\s\S]*?function path/,layout+'function path');
+    html=html.replace(/function fitView\(\)\{[\s\S]*?function touchDistance/,`function fitView(){
   if(!nodes.length){updateTransform();return}
   let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
   nodes.forEach(n=>{
