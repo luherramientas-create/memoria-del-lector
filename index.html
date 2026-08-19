@@ -12,4 +12,17 @@
 <div id="modal" class="modal hidden"><div class="modal-card"><button class="close" id="closeModal">×</button><div id="modalBody"></div></div></div>
 <div id="toast" class="toast hidden"></div>
 <script src="app.js"></script><script src="map-labels.js"></script><script src="map-neural-link.js"></script><script src="backup.js"></script><script src="duplicate-manager.js"></script><script src="character-name-guard.js"></script><script src="relationship-guard.js"></script><script src="delete-manager.js"></script><script src="session-manager.js"></script><script src="cover-manager.js"></script><script src="mobile-map-fullscreen.js?v=7.1.1"></script>
+<script>
+window.addEventListener('load',function(){
+  if(!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.register('./sw.js',{scope:'./'})
+    .then(function(registration){
+      console.info('[Memoria del Lector] Service Worker registrado:',registration.scope);
+      if(registration.waiting) registration.waiting.postMessage({type:'SKIP_WAITING'});
+    })
+    .catch(function(error){
+      console.error('[Memoria del Lector] Error registrando Service Worker:',error);
+    });
+});
+</script>
 </body></html>
