@@ -1,9 +1,9 @@
-// FASE 7.1 + 7.3 — Mapa en modo ampliado y controles táctiles del mapa normal
+// FASE 7.4 — Mapa ampliado: controles de pantalla completa en la esquina superior derecha
 (function(){
   const mq = window.matchMedia('(max-width: 1100px), (pointer: coarse)');
   const style=document.createElement('style');
   style.textContent=`
-    .mobile-map-fs-controls{display:flex!important;position:absolute;left:10px;bottom:10px;z-index:80;gap:8px;flex-wrap:wrap}
+    .mobile-map-fs-controls{display:flex!important;position:absolute;right:10px;top:10px;left:auto;bottom:auto;z-index:80;gap:8px;flex-wrap:wrap}
     .mobile-map-fs-controls button{border:1px solid var(--line);background:#fffffff2;color:var(--accent);border-radius:12px;padding:10px 12px;font-weight:800;box-shadow:0 4px 14px #0002}
     body.mobile-map-expanded{overflow:hidden!important}
     body.mobile-map-expanded>.top,body.mobile-map-expanded>.tabs{display:none!important}
@@ -13,7 +13,7 @@
     body.mobile-map-expanded .map-wrap{height:100vh!important;height:100dvh!important;min-height:100%!important;border-top:0!important}
     body.mobile-map-expanded .map-toolbar{position:absolute!important;top:0;left:0;right:0;z-index:60;background:#fffffff2;border-bottom:1px solid var(--line);padding:8px;max-height:25vh;overflow:auto}
     body.mobile-map-expanded .map-side{display:none!important}
-    body.mobile-map-expanded .mobile-map-fs-controls{left:auto;right:12px;top:12px;bottom:auto;z-index:100}
+    body.mobile-map-expanded .mobile-map-fs-controls{right:12px;top:12px;left:auto;bottom:auto;z-index:100}
     body.mobile-map-expanded .mobile-map-fs-exit{display:block!important}
     body.mobile-map-expanded .zoom-box{top:58px;right:10px}
     body.mobile-map-expanded .map-wrap svg{height:100%!important}
@@ -30,7 +30,7 @@
     const box=document.querySelector('.zoom-box');
     if(!box)return;
     const buttons=box.querySelectorAll('button');
-    if(buttons.length>=3 && st)buttons[1].textContent=Math.round(st.zoom*100)+'%';
+    if(buttons.length>=3&&st)buttons[1].textContent=Math.round(st.zoom*100)+'%';
   }
 
   function applyMapTransform(){
@@ -43,29 +43,23 @@
   function installMapTouch(){
     const wrap=document.querySelector('.map-wrap'),svg=document.getElementById('mapSvg');
     if(!wrap||!svg)return;
-    if(wrap.dataset.mapTouchReady==='1'){
-      syncZoomReadout();
-      return;
-    }
+    if(wrap.dataset.mapTouchReady==='1'){syncZoomReadout();return}
     wrap.dataset.mapTouchReady='1';
     wrap.classList.add('map-touch-ready');
 
     const originalMapZoom=window.mapZoom;
-    if(typeof originalMapZoom==='function' && !window.__mapZoom73){
+    if(typeof originalMapZoom==='function'&&!window.__mapZoom73){
       window.__mapZoom73=true;
       window.mapZoom=function(delta){
         originalMapZoom(delta);
         const st=getMapState();
-        if(st){
-          svg.style.transform=`translate(${st.panX}px,${st.panY}px) scale(${st.zoom})`;
-        }
+        if(st)svg.style.transform=`translate(${st.panX}px,${st.panY}px) scale(${st.zoom})`;
         syncZoomReadout();
       };
     }
 
     let pointers=new Map();
     let pinch=null;
-
     const distance=(a,b)=>Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
     const center=(a,b)=>({x:(a.clientX+b.clientX)/2,y:(a.clientY+b.clientY)/2});
 
@@ -83,8 +77,7 @@
       if(pointers.size===2){pinch=null;beginPinch();e.preventDefault()}
     };
     const onMove=e=>{
-      if(e.pointerType!=='touch')return;
-      if(!pointers.has(e.pointerId))return;
+      if(e.pointerType!=='touch'||!pointers.has(e.pointerId))return;
       pointers.set(e.pointerId,e);
       if(pointers.size<2||!pinch)return;
       const pts=[...pointers.values()],a=pts[0],b=pts[1],c=center(a,b),st=getMapState();
@@ -107,7 +100,7 @@
     svg.addEventListener('pointercancel',onUp);
   }
 
-  function mapWrap(){ return document.querySelector('.map-wrap'); }
+  function mapWrap(){return document.querySelector('.map-wrap')}
 
   function install(){
     const wrap=mapWrap();
