@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>🧠 Mapa neuronal</title>
+<style>html,body{margin:0;height:100%;background:#0b1020;color:#e9edf7;font-family:system-ui,-apple-system,Segoe UI,sans-serif;display:grid;place-items:center}main{text-align:center;padding:24px;font-size:15px;opacity:.8}</style>
+</head>
+<body>
+<main>🧠 Cargando mapa neuronal…</main>
+<script>
+(async()=>{
+  try{
+    const res=await fetch('neural-map-real.html?v=7.4.0',{cache:'no-store'});
+    if(!res.ok) throw new Error('No se pudo cargar el mapa neuronal');
+    let html=await res.text();
+
+    const layout=`function displayLabel(n){
+  const raw=String(n.short||n.name||'?').trim();
+  const maxChars=W<460?12:(W<820?18:24);
+  return raw.length>maxChars?raw.slice(0,maxChars-1).trimEnd()+'…':raw;
+}
+function labelWidth(n){
+  const max=W<460?108:(W<820?155:185);
+  return Math.max(54,Math.min(max,displayLabel(n).length*(W<460?5.8:6.2)+12));
+}
+function layoutNodes(){
+  if(!nodes.length)return;
+  // Distribución estable por filas: los personajes más conectados ocupan
+  // las posiciones más cercanas al centro. Así se evita el amontonamiento
+  // incluso en pantallas estrechas.
+  const cols=W<460?2:(W<820?3:(W<1100?4:5));
+  const rows=Math.ceil(nodes.length/cols);
+  const xGap=W/(cols+1), yGap=H/(rows+1);
+  const slots=[];
+  for(let r=0;r<rows;r++){
+    for(let c=0;c<cols;c++){
+      if(slots.length>=nodes.length)break;
+      const offset=(r%2&&cols>2)?Math.min(xGap*.12,28):0;
+      slots.push({x:(c+1)*xGap+offset,y:(r+1)*yGap});
+    }
+  }
+  const cx=W/2,cy=H/2;
+  slots.sort((a,b)=>Math.hypot(a.x-cx,a.y-cy)-Math.hypot(b.x-cx,b.y-cy));
+  const degree=new Map(nodes.map(n=>[n.id,0]));
+  edges.forEach(e=>{degree.set(e.a,(degree.get(e.a)||0)+1);degree.set(e.b,(degree.get(e.b)||0)+1)});
+  const ordered=[...nodes].sort((a,b)=>(degree.get(b.id)||0)-(degree.get(a.id)||0));
+  ordered.forEach((n,i)=>{n.x=slots[i].x;n.y=slots[i].y;n.vx=0;n.vy=0});
+  resolveOverlaps();
+}
+function resolveOverlaps(){
+  for(let pass=0;pass<30;pass++){
+    let moved=false;
+    for(let i=0;i<nodes.length;i++){
+      for(let j=i+1;j<nodes.length;j++){
+        const a=nodes[i],b=nodes[j];
+        const aw=labelWidth(a)/2+8,bw=labelWidth(b)/2+8;
+        const ah=a.r+22,bh=b.r+22;
+        const ox=(aw+bw)-Math.abs(a.x-b.x),oy=(ah+bh)-Math.abs(a.y-b.y);
+        if(ox>0&&oy>0){
+          if(ox<oy){const dir=a.x<=b.x?-1:1;const push=ox/2;a.x+=dir*push;b.x-=dir*push}
+          else{const dir=a.y<=b.y?-1:1;const push=oy/2;a.y+=dir*push;b.y-=dir*push}
+          moved=true;
+        }
+      }
+    }
+    for(const n of nodes){
+      const padX=20+labelWidth(n)/2,padY=30+n.r+12;
+      n.x=Math.max(padX,Math.min(W-padX,n.x));
+      n.y=Math.max(padY,Math.min(H-padY,n.y));
+    }
+    if(!moved)break;
+  }
+}
+`;
+    html=html.replace(/function layoutNodes\(\)\{[\s\S]*?\n\}\nfunction resolveOverlaps\(\)\{[\s\S]*?\n\}\nfunction path/,layout+'function path');
+    html=html.replace(/function fitView\(\)\{[\s\S]*?\n\}\nfunction touchDistance/,`function fitView(){
+  if(!nodes.length){updateTransform();return}
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  nodes.forEach(n=>{
+    const hw=labelWidth(n)/2;
+    minX=Math.min(minX,n.x-n.r-hw*.15);
+    maxX=Math.max(maxX,n.x+n.r+hw);
+    minY=Math.min(minY,n.y-n.r-18);
+    maxY=Math.max(maxY,n.y+n.r+18);
+  });
+  const bw=Math.max(1,maxX-minX),bh=Math.max(1,maxY-minY),margin=55;
+  scale=Math.max(.35,Math.min(2.5,Math.min((W-margin*2)/bw,(H-margin*2)/bh)));
+  pan.x=W/2-((minX+maxX)/2)*scale;
+  pan.y=H/2-((minY+maxY)/2)*scale;
+  updateTransform();
+}
+function touchDistance`);
+    html=html.replace(/t\.textContent=n\.short\|\|n\.name/,'t.textContent=displayLabel(n)');
+    document.open();document.write(html);document.close();
+  }catch(err){document.body.innerHTML='<main>⚠️ No se pudo cargar el mapa neuronal.<br><small>'+String(err.message||err)+'</small></main>'}
+})();
+</script>
+</body>
+</html>
