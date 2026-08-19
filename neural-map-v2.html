@@ -10,7 +10,7 @@
 <script>
 (async()=>{
   try{
-    const res=await fetch('neural-map-real.html?v=7.5.1',{cache:'no-store'});
+    const res=await fetch('neural-map-real.html?v=7.5.2',{cache:'no-store'});
     if(!res.ok) throw new Error('No se pudo cargar el mapa neuronal');
     let html=await res.text();
 
@@ -79,8 +79,6 @@ function layoutNodes(){
   }
 }
 `;
-    // La versión real está minificada; este reemplazo no depende de saltos
-    // de línea dentro de layoutNodes/resolveOverlaps.
     html=html.replace(/function layoutNodes\(\)\{[\s\S]*?function path/,layout+'function path');
     html=html.replace(/function fitView\(\)\{[\s\S]*?function touchDistance/,`function fitView(){
   if(!nodes.length){updateTransform();return}
@@ -100,6 +98,39 @@ function layoutNodes(){
 }
 function touchDistance`);
     html=html.replace(/t\.textContent=n\.short\|\|n\.name/,'t.textContent=displayLabel(n)');
+
+    // Profundidad: los botones 1/2/3 deben producir un cambio visible incluso
+    // si todavía no se seleccionó un personaje. En ese caso usamos como foco
+    // temporal al personaje con más relaciones.
+    const depthPatch=`
+<script>
+(function(){
+  function installDepthControls(){
+    const buttons=document.querySelectorAll('.depthBtn');
+    if(!buttons.length)return;
+    buttons.forEach(btn=>{
+      if(btn.dataset.depthPatchInstalled==='1')return;
+      btn.dataset.depthPatchInstalled='1';
+      btn.addEventListener('click',function(){
+        const d=Number(this.dataset.depth||0);
+        if(d>0 && selected===null && nodes.length){
+          selected=nodes.reduce((best,n)=>{
+            const degree=edges.reduce((c,e)=>c+(e.a===n.id||e.b===n.id?1:0),0);
+            const bestDegree=best?edges.reduce((c,e)=>c+(e.a===best.id||e.b===best.id?1:0),0):-1;
+            return degree>bestDegree?n:best;
+          },null).id;
+        }
+        depth=d;
+        updateDepthButtons();
+        render();
+      });
+    });
+  }
+  installDepthControls();
+})();
+</script>`;
+    html=html.replace('</body>',depthPatch+'</body>');
+
     document.open();document.write(html);document.close();
   }catch(err){document.body.innerHTML='<main>⚠️ No se pudo cargar el mapa neuronal.<br><small>'+String(err.message||err)+'</small></main>'}
 })();
