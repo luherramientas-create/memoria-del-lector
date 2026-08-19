@@ -8,10 +8,10 @@
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#0b1020;color:#e9edf7}
 body{overflow:hidden}
-.top{height:58px;display:flex;align-items:center;gap:10px;padding:0 16px;background:#11182b;border-bottom:1px solid #26304a}
-.top h1{font-size:16px;margin:0}.top span{font-size:12px;opacity:.7}
-.controls{margin-left:auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-.top button{border:1px solid #3a4664;background:#18213a;color:#fff;border-radius:8px;padding:7px 10px;cursor:pointer}
+.top{min-height:58px;display:flex;align-items:center;gap:10px;padding:8px 16px;background:#11182b;border-bottom:1px solid #26304a}
+.top h1{font-size:16px;margin:0;white-space:nowrap}.top span{font-size:12px;opacity:.7}
+.controls{margin-left:auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.top button{border:1px solid #3a4664;background:#18213a;color:#fff;border-radius:8px;padding:7px 10px;cursor:pointer;white-space:nowrap}
 .top button:hover{background:#202c49}.top button.active{border-color:#a9b9ef;background:#293759}
 .nav-btn{border-color:#56688f!important;background:#202d4a!important}
 .zoom-readout,.depth-label{min-width:50px;text-align:center;font-size:12px;opacity:.8}
@@ -26,6 +26,26 @@ svg{width:100%;height:100%;display:block;touch-action:none;cursor:grab}.wrap.pan
 .tooltip strong{display:block;margin-bottom:5px}.tooltip .description{white-space:pre-wrap;margin:5px 0}.tooltip .meta{margin-top:5px;opacity:.78}
 .hint,.status,.depth{position:absolute;padding:8px 10px;border-radius:8px;background:#11182bcc;border:1px solid #2c3753;font-size:12px;pointer-events:none}
 .hint{left:14px;bottom:14px;opacity:.8}.status{left:14px;top:14px}.depth{right:14px;bottom:14px}
+@media (max-width:700px){
+  .top{height:auto;min-height:0;display:block;padding:8px 10px}
+  .top h1{font-size:15px;display:inline-block;margin-right:6px}
+  .top>span{font-size:11px;display:inline}
+  .controls{margin:7px 0 0;display:flex;justify-content:flex-start;gap:5px;overflow:visible}
+  .controls .depth-label{display:none}
+  .top button{padding:7px 8px;font-size:12px}
+  .nav-btn{order:1}.depthBtn{order:2}.zoom-readout{order:3;min-width:44px}.controls #minus,.controls #plus{order:3}.controls #fit,.controls #reset{order:4}
+  .wrap{height:calc(100% - 96px)}
+  .status{top:8px;left:8px;font-size:11px}
+  .hint{left:8px;bottom:8px;right:8px;font-size:11px;max-width:none}
+  .depth{right:8px;bottom:8px;font-size:11px;max-width:58%;text-align:right}
+}
+@media (max-width:430px){
+  .top>span{display:block;margin-top:2px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .controls{gap:4px}
+  .top button{padding:6px 7px;font-size:11px}
+  .zoom-readout{font-size:11px;min-width:42px}
+  .wrap{height:calc(100% - 122px)}
+}
 </style>
 </head>
 <body>
@@ -74,6 +94,7 @@ const zoomReadout=document.getElementById('zoomReadout');
 const depthInfo=document.getElementById('depthInfo');
 const visibleInfo=document.getElementById('visibleInfo');
 let W=0,H=0,nodes=[],edges=[],selected=null,drag=null,pan={x:0,y:0},scale=1,panStart=null,depth=0;
+let pinch=null;
 function load(){try{return JSON.parse(localStorage.getItem(KEY)||'null')||{books:[],activeBookId:null}}catch(e){return {books:[],activeBookId:null}}}
 function activeBook(){const s=load();return s.books.find(b=>b.id===s.activeBookId)||null}
 function esc(s){return String(s??'').replace(/[&<>\"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#039;'}[c]))}
@@ -101,7 +122,7 @@ function layoutNodes(){
     const cooling=1-(it/iterations)*0.72;for(const n of nodes){n.vx*=0.82;n.vy*=0.82}
     for(let i=0;i<nodes.length;i++){const a=nodes[i];for(let j=i+1;j<nodes.length;j++){const b=nodes[j];let dx=a.x-b.x,dy=a.y-b.y,d=Math.hypot(dx,dy)||0.1;const minD=(a.r+b.r)+Math.max(34,(labelWidth(a)+labelWidth(b))*0.22),rep=9000/(d*d)+Math.max(0,(minD-d))*2.2,ux=dx/d,uy=dy/d;a.vx+=ux*rep*cooling;b.vx-=ux*rep*cooling;a.vy+=uy*rep*cooling;b.vy-=uy*rep*cooling}}
     for(const e of edges){const a=nodeById.get(e.a),b=nodeById.get(e.b);if(!a||!b)continue;const dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy)||0.1,target=145+Math.min(55,(labelWidth(a)+labelWidth(b))*0.18),f=(d-target)*0.008,ux=dx/d,uy=dy/d;a.vx+=ux*f;b.vx-=ux*f;a.vy+=uy*f;b.vy-=uy*f}
-    for(const n of nodes){n.vx+=(cx-n.x)*0.0018;n.vy+=(cy-n.y)*0.0018;const maxStep=3.8;n.x+=Math.max(-maxStep,Math.min(maxStep,n.vx));n.y+=Math.max(-maxStep,Math.min(maxStep,n.vy));const pad=45;n.x=Math.max(pad+labelWidth(n)/2,Math.min(W-pad-labelWidth(n)/2,n.x));n.y=Math.max(pad+n.r+18,Math.min(H-pad,n.y))}
+    for(const n of nodes){n.vx+=(cx-n.x)*0.0018;n.vy+=(cy-n.y)*0.0018;const maxStep=3.8;n.x+=Math.max(-maxStep,Math.min(maxStep,n.vx));n.y+=Math.max(-maxStep,Math.min(maxStep,n.y));const pad=45;n.x=Math.max(pad+labelWidth(n)/2,Math.min(W-pad-labelWidth(n)/2,n.x));n.y=Math.max(pad+n.r+18,Math.min(H-pad,n.y))}
   }
   resolveOverlaps();
 }
@@ -121,14 +142,22 @@ function placeTip(e){const r=wrap.getBoundingClientRect(),x=e.clientX-r.left+12,
 function edgeEnter(e){const ed=edges[+e.currentTarget.dataset.i];tip.innerHTML=ed.relations.map(rel=>`<div><strong>${esc(nameOf(rel.from))} ${rel.mode==='symmetric'?'↔':'→'} ${esc(nameOf(rel.to))}</strong><div>• ${esc(rel.label)}</div></div>`).join('');tip.style.display='block';placeTip(e)}
 function nodeEnter(e,n){const b=activeBook(),c=(b?.characters||[]).find(x=>x.id===n.id);tip.innerHTML=`<strong>${esc(c?.name||n.name)}</strong>`+(c?.description?.trim()?`<div class="description">${esc(c.description)}</div>`:'')+(c?.firstChapter?`<div class="meta">Primera aparición: ${esc(c.firstChapter)}</div>`:'');tip.style.display='block';placeTip(e)}
 function nameOf(id){return nodes.find(x=>x.id===id)?.name||'?'}
-function startDrag(e,n){e.stopPropagation();n._sx=e.clientX;n._sy=e.clientY;n._moved=false;drag=n;const move=ev=>{if(Math.hypot(ev.clientX-n._sx,ev.clientY-n._sy)>4)n._moved=true;const r=svg.getBoundingClientRect();n.x=(ev.clientX-r.left-pan.x)/scale;n.y=(ev.clientY-r.top-pan.y)/scale;render()};const up=()=>{drag=null;window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up)};window.addEventListener('pointermove',move);window.addEventListener('pointerup',up,{once:true})}
-function startPan(e){if(e.target!==svg)return;panStart={sx:e.clientX,sy:e.clientY,px:pan.x,py:pan.y};wrap.classList.add('panning');const move=ev=>{pan.x=panStart.px+(ev.clientX-panStart.sx);pan.y=panStart.py+(ev.clientY-panStart.sy);updateTransform()};const up=()=>{panStart=null;wrap.classList.remove('panning');window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up)};window.addEventListener('pointermove',move);window.addEventListener('pointerup',up,{once:true})}
+function startDrag(e,n){if(e.pointerType==='touch'&&pinch)return;e.stopPropagation();n._sx=e.clientX;n._sy=e.clientY;n._moved=false;drag=n;const move=ev=>{if(pinch)return;if(Math.hypot(ev.clientX-n._sx,ev.clientY-n._sy)>4)n._moved=true;const r=svg.getBoundingClientRect();n.x=(ev.clientX-r.left-pan.x)/scale;n.y=(ev.clientY-r.top-pan.y)/scale;render()};const up=()=>{drag=null;window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up)};window.addEventListener('pointermove',move);window.addEventListener('pointerup',up,{once:true})}
+function startPan(e){if(e.target!==svg||pinch)return;panStart={sx:e.clientX,sy:e.clientY,px:pan.x,py:pan.y};wrap.classList.add('panning');const move=ev=>{if(pinch)return;pan.x=panStart.px+(ev.clientX-panStart.sx);pan.y=panStart.py+(ev.clientY-panStart.sy);updateTransform()};const up=()=>{panStart=null;wrap.classList.remove('panning');window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',up)};window.addEventListener('pointermove',move);window.addEventListener('pointerup',up,{once:true})}
 function zoomAt(factor,cx=W/2,cy=H/2){const old=scale,next=Math.max(.35,Math.min(2.5,old*factor));if(next===old)return;const r=svg.getBoundingClientRect(),sx=cx-r.left,sy=cy-r.top;pan.x=sx-(sx-pan.x)*(next/old);pan.y=sy-(sy-pan.y)*(next/old);scale=next;updateTransform()}
 function fitView(){if(!nodes.length){updateTransform();return}let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;nodes.forEach(n=>{minX=Math.min(minX,n.x-n.r);maxX=Math.max(maxX,n.x+n.r,labelWidth(n)/2);minY=Math.min(minY,n.y-n.r-18);maxY=Math.max(maxY,n.y+n.r+18)});const bw=Math.max(1,maxX-minX),bh=Math.max(1,maxY-minY),margin=70;scale=Math.max(.35,Math.min(2.5,Math.min((W-margin*2)/bw,(H-margin*2)/bh)));pan.x=W/2-((minX+maxX)/2)*scale;pan.y=H/2-((minY+maxY)/2)*scale;updateTransform()}
+function touchDistance(a,b){return Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY)}
+function touchCenter(a,b){return {x:(a.clientX+b.clientX)/2,y:(a.clientY+b.clientY)/2}}
+function startPinch(){const pts=[...activePointers.values()];if(pts.length<2)return;const a=pts[0],b=pts[1],center=touchCenter(a,b);pinch={startDistance:touchDistance(a,b),startScale:scale,centerX:center.x,centerY:center.y,panX:pan.x,panY:pan.y}}
+const activePointers=new Map();
+svg.addEventListener('pointerdown',e=>{if(e.pointerType!=='touch')return;activePointers.set(e.pointerId,e);if(activePointers.size===2){drag=null;panStart=null;startPinch();e.preventDefault()}},{passive:false});
+svg.addEventListener('pointermove',e=>{if(e.pointerType!=='touch')return;activePointers.set(e.pointerId,e);if(activePointers.size<2||!pinch)return;const pts=[...activePointers.values()];const a=pts[0],b=pts[1],dist=touchDistance(a,b),center=touchCenter(a,b);const next=Math.max(.35,Math.min(2.5,pinch.startScale*(dist/pinch.startDistance)));const r=svg.getBoundingClientRect(),sx=pinch.centerX-r.left,sy=pinch.centerY-r.top;pan.x=sx-(sx-pinch.panX)*(next/pinch.startScale)+(center.x-pinch.centerX);pan.y=sy-(sy-pinch.panY)*(next/pinch.startScale)+(center.y-pinch.centerY);scale=next;updateTransform();e.preventDefault()},{passive:false});
+function endTouch(e){if(e.pointerType!=='touch')return;activePointers.delete(e.pointerId);if(activePointers.size<2)pinch=null}
+svg.addEventListener('pointerup',endTouch);svg.addEventListener('pointercancel',endTouch);svg.addEventListener('pointerleave',e=>{if(e.pointerType==='touch')activePointers.delete(e.pointerId)});
 document.getElementById('normalMap').onclick=()=>{window.location.href='index.html#map'};
 document.getElementById('mainApp').onclick=()=>{window.location.href='index.html'};
 document.querySelectorAll('.depthBtn').forEach(btn=>btn.onclick=()=>{if(selected===null&&+btn.dataset.depth>0){status.textContent='Selecciona primero un personaje para explorar por niveles.';return}depth=+btn.dataset.depth;updateDepthButtons();render()});
-document.getElementById('minus').onclick=()=>zoomAt(.85);document.getElementById('plus').onclick=()=>zoomAt(1.18);document.getElementById('fit').onclick=fitView;document.getElementById('reset').onclick=()=>{layoutNodes();render();fitView()};svg.addEventListener('pointerdown',startPan);svg.addEventListener('wheel',e=>{e.preventDefault();zoomAt(e.deltaY<0?1.12:.89,e.clientX,e.clientY)},{passive:false});window.addEventListener('resize',()=>{size();fitView()});size();build();
+document.getElementById('minus').onclick=()=>zoomAt(.85);document.getElementById('plus').onclick=()=>zoomAt(1.18);document.getElementById('fit').onclick=fitView;document.getElementById('reset').onclick=()=>{layoutNodes();render();fitView};svg.addEventListener('pointerdown',startPan);svg.addEventListener('wheel',e=>{e.preventDefault();zoomAt(e.deltaY<0?1.12:.89,e.clientX,e.clientY)},{passive:false});window.addEventListener('resize',()=>{size();fitView()});size();build();
 </script>
 </body>
 </html>
