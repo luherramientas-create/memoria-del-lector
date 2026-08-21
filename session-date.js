@@ -58,13 +58,8 @@
     wrap.querySelector('[data-date-action="none"]').onclick=()=>{input.value='';markDirty()};
   }
 
-  function currentDateValue(){
-    return document.getElementById('sessionDateInput')?.value||'';
-  }
-
-  function isDateDirty(){
-    return document.getElementById('sessionV2Form')?.dataset.sessionDateDirty==='1';
-  }
+  function currentDateValue(){return document.getElementById('sessionDateInput')?.value||''}
+  function isDateDirty(){return document.getElementById('sessionV2Form')?.dataset.sessionDateDirty==='1'}
 
   window.newSession=function(){
     if(originalNewSession)originalNewSession.apply(this,arguments);
@@ -77,12 +72,14 @@
       const b=typeof active==='function'?active():null;
       const s=b?.sessions?.find(x=>x.id===id);
       injectDateControl(s?.date||'');
-    },30);
+      const input=document.getElementById('sessionDateInput');
+      if(input)input.dataset.initialSessionId=id;
+    },40);
   };
 
   window.createSession=function(e){
     const before=new Set(((typeof active==='function'?active():null)?.sessions||[]).map(s=>s.id));
-    const dirty=document.getElementById('sessionV2Form')?.dataset.sessionDateDirty==='1';
+    const dirty=isDateDirty();
     const selected=currentDateValue();
     if(originalCreateSession)originalCreateSession.apply(this,arguments);
     setTimeout(()=>{
@@ -90,7 +87,6 @@
       if(!b)return;
       const created=(b.sessions||[]).find(s=>!before.has(s.id));
       if(!created)return;
-      // New sessions default to no date unless the user explicitly chose one.
       created.date=dirty&&selected?displayDate(selected):'';
       if(typeof save==='function')save();
       if(typeof renderSessions==='function')renderSessions();
@@ -101,31 +97,16 @@
     const form=document.getElementById('sessionV2Form');
     const dirty=form?.dataset.sessionDateDirty==='1';
     const selected=currentDateValue();
-    const sessionId=form?.getAttribute('onsubmit')?.match(/updateSession\(event\)/)?null:null;
-    const b=typeof active==='function'?active():null;
-    const before=(b?.sessions||[]).map(s=>({id:s.id,date:s.date}));
+    const targetId=form?.querySelector('#sessionDateInput')?.dataset.initialSessionId||'';
     if(originalUpdateSession)originalUpdateSession.apply(this,arguments);
-    if(!dirty)return;
+    if(!dirty||!targetId)return;
     setTimeout(()=>{
       const book=typeof active==='function'?active():null;
-      if(!book)return;
-      const changed=before.find(x=>x.date!==undefined && (book.sessions||[]).some(s=>s.id===x.id));
-      const candidates=(book.sessions||[]).filter(s=>before.some(x=>x.id===s.id));
-      // The edited session is the one whose form was open; use the session
-      // whose previous date is represented by the form's initial value when possible.
-      const input=document.getElementById('sessionDateInput');
-      const initial=input?.dataset.initialSessionId;
-      let target=initial?(book.sessions||[]).find(s=>s.id===initial):null;
-      if(!target&&candidates.length===1)target=candidates[0];
-      if(target){target.date=selected?displayDate(selected):'';if(typeof save==='function')save();if(typeof renderSessions==='function')renderSessions()}
+      const target=book?.sessions?.find(s=>s.id===targetId);
+      if(!target)return;
+      target.date=selected?displayDate(selected):'';
+      if(typeof save==='function')save();
+      if(typeof renderSessions==='function')renderSessions();
     },40);
-  };
-
-  // Preserve the edited session id on the date control without changing the
-  // existing session-manager implementation.
-  const baseEdit=window.editSession;
-  window.editSession=function(id){
-    baseEdit.apply(this,arguments);
-    setTimeout(()=>{const input=document.getElementById('sessionDateInput');if(input)input.dataset.initialSessionId=id},60);
   };
 })();
